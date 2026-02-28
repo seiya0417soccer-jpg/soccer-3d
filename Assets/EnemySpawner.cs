@@ -2,17 +2,15 @@ using UnityEngine;
 
 public class EnemySpawner : MonoBehaviour
 {
-    public GameObject enemyPrefab; // ‚³‚Á‚«ì‚Á‚½Â‚¢ƒAƒCƒRƒ“‚ÌEnemy‚ğ“ü‚ê‚é˜g
-    public float spawnInterval = 3.0f; // 3•b‚¨‚«
-    float timer = 0;
+    public GameObject enemyPrefab; // ¢Š«‚·‚é“G
+    private GameObject currentEnemy; // Œ»İê‚É‚¢‚é“G
 
     void Update()
     {
-        timer += Time.deltaTime; // ŠÔ‚ğƒJƒEƒ“ƒg
-        if (timer >= spawnInterval)
+        // “G‚ª‚¢‚È‚¯‚ê‚ÎV‚µ‚­—N‚©‚¹‚é
+        if (currentEnemy == null)
         {
             Spawn();
-            timer = 0;
         }
     }
 
@@ -23,7 +21,7 @@ public class EnemySpawner : MonoBehaviour
         float z = Random.Range(-14f, 14f);
         Vector3 pos = new Vector3(x, 0.5f, z);
 
-        // “G‚ğ¢Š«I
-        Instantiate(enemyPrefab, pos, Quaternion.identity);
+        // “G‚ğ¢Š«‚µ‚ÄcurrentEnemy‚É•Û‘¶
+        currentEnemy = Instantiate(enemyPrefab, pos, Quaternion.identity);
     }
 }

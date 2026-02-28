@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 1715139851477010797}
   - component: {fileID: 6034080547262197421}
   m_Layer: 0
-  m_Name: TetrisWall
+  m_Name: TetrisBlock
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

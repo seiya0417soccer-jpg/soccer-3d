@@ -1,63 +1,57 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
-public class NewTetris : MonoBehaviour
+public class DropPuzzleBattle : MonoBehaviour
 {
     public GameObject GridPrefub;
 
-    private const int Width = 10;
-    private const int Height = 20;
+    private const int Width = 15;
+    private const int Height = 22;
 
     private int[,] field = new int[Height, Width];
     private GameObject[,] gridObjects;
 
-    private enum MinoType { I, J, L, T, O, S, Z }
-    private Dictionary<MinoType, Vector2Int[]> minoData;
+    private const int PieceCount = 8;
+    private Dictionary<int, Vector2Int[]> pieceData;
 
     private Vector2Int[] currentShape;
     private Vector2Int currentPos;
-    private MinoType currentType;
+    private int currentType;
 
     private float fallTimer;
     private float fallInterval = 1f;
 
-    // 🔥 カメラが105にあるので合わせる
     private float offsetX = 100f;
     private float offsetY = 0f;
 
-    private Color[] minoColors =
+    private Color[] pieceColors =
     {
         Color.cyan,
         Color.blue,
-        new Color(1f,0.5f,0f),
-        Color.magenta,
-        Color.yellow,
         Color.green,
-        Color.red
+        Color.red,
+        Color.yellow,
+        Color.magenta,
+        new Color(1f, 0.5f, 0f),
+        new Color(0.5f, 0f, 1f),
+        Color.white
     };
 
     void Start()
     {
         gridObjects = new GameObject[Height, Width];
-
         for (int y = 0; y < Height; y++)
-        {
             for (int x = 0; x < Width; x++)
             {
                 GameObject obj = Instantiate(GridPrefub);
-                obj.transform.position = new Vector3(
-                    x + offsetX,
-                    y + offsetY,
-                    0
-                );
+                obj.transform.position = new Vector3(x + offsetX, y + offsetY, 0);
                 obj.SetActive(false);
                 gridObjects[y, x] = obj;
             }
-        }
 
         CreateWall();
-        InitMino();
-        SpawnMino();
+        InitPieces();
+        SpawnPiece();
     }
 
     void CreateWall()
@@ -78,11 +72,7 @@ public class NewTetris : MonoBehaviour
     void CreateWallBlock(int x, int y)
     {
         GameObject wall = Instantiate(GridPrefub);
-        wall.transform.position = new Vector3(
-            x + offsetX,
-            y + offsetY,
-            0
-        );
+        wall.transform.position = new Vector3(x + offsetX, y + offsetY, 0);
         wall.GetComponent<Renderer>().material.color = Color.gray;
     }
 
@@ -97,70 +87,37 @@ public class NewTetris : MonoBehaviour
             Move(Vector2Int.down);
         }
 
-        if (Input.GetKeyDown(KeyCode.A))
-            Move(Vector2Int.left);
-
-        if (Input.GetKeyDown(KeyCode.D))
-            Move(Vector2Int.right);
-
-        if (Input.GetKeyDown(KeyCode.W))
-            Rotate();
+        if (Input.GetKeyDown(KeyCode.A)) Move(Vector2Int.left);
+        if (Input.GetKeyDown(KeyCode.D)) Move(Vector2Int.right);
+        if (Input.GetKeyDown(KeyCode.W)) Rotate();
 
         Draw();
     }
 
-    void InitMino()
+    void InitPieces()
     {
-        minoData = new Dictionary<MinoType, Vector2Int[]>();
+        pieceData = new Dictionary<int, Vector2Int[]>();
 
-        minoData[MinoType.I] = new Vector2Int[]
-        {
-            new Vector2Int(-1,0), new Vector2Int(0,0),
-            new Vector2Int(1,0), new Vector2Int(2,0)
-        };
+        // 5マス（階段状のみ）
+        pieceData[0] = new Vector2Int[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1), new Vector2Int(2, 1), new Vector2Int(2, 2) };
 
-        minoData[MinoType.O] = new Vector2Int[]
-        {
-            new Vector2Int(0,0), new Vector2Int(1,0),
-            new Vector2Int(0,1), new Vector2Int(1,1)
-        };
+        // 3マス
+        pieceData[1] = new Vector2Int[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1) };
 
-        minoData[MinoType.T] = new Vector2Int[]
-        {
-            new Vector2Int(-1,0), new Vector2Int(0,0),
-            new Vector2Int(1,0), new Vector2Int(0,1)
-        };
-
-        minoData[MinoType.J] = new Vector2Int[]
-        {
-            new Vector2Int(-1,0), new Vector2Int(0,0),
-            new Vector2Int(1,0), new Vector2Int(-1,1)
-        };
-
-        minoData[MinoType.L] = new Vector2Int[]
-        {
-            new Vector2Int(-1,0), new Vector2Int(0,0),
-            new Vector2Int(1,0), new Vector2Int(1,1)
-        };
-
-        minoData[MinoType.S] = new Vector2Int[]
-        {
-            new Vector2Int(0,0), new Vector2Int(1,0),
-            new Vector2Int(-1,1), new Vector2Int(0,1)
-        };
-
-        minoData[MinoType.Z] = new Vector2Int[]
-        {
-            new Vector2Int(-1,0), new Vector2Int(0,0),
-            new Vector2Int(0,1), new Vector2Int(1,1)
-        };
+        // 4マス I,L,S,T,J,Z
+        pieceData[2] = new Vector2Int[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
+        pieceData[3] = new Vector2Int[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1) };
+        pieceData[4] = new Vector2Int[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(-1, 1), new Vector2Int(0, 1) };
+        pieceData[5] = new Vector2Int[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(0, 1) };
+        pieceData[6] = new Vector2Int[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(-1, 1) };
+        pieceData[7] = new Vector2Int[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(0, 1), new Vector2Int(1, 1) };
     }
 
-    void SpawnMino()
+    void SpawnPiece()
     {
-        currentType = (MinoType)Random.Range(0, 7);
-        currentShape = minoData[currentType];
-        currentPos = new Vector2Int(Width / 2, Height - 1);
+        currentType = Random.Range(0, PieceCount);
+        currentShape = pieceData[currentType];
+        currentPos = new Vector2Int(Width / 2, Height - 2);
 
         if (!IsValidPosition(currentPos, currentShape))
         {
@@ -179,23 +136,19 @@ public class NewTetris : MonoBehaviour
         }
         else if (dir == Vector2Int.down)
         {
-            FixMino();
+            FixPiece();
             ClearLines();
-            SpawnMino();
+            SpawnPiece();
         }
     }
 
     void Rotate()
     {
-        if (currentType == MinoType.O) return;
-
-        Vector2Int[] rotated = new Vector2Int[4];
-
+        Vector2Int[] rotated = new Vector2Int[currentShape.Length];
         for (int i = 0; i < currentShape.Length; i++)
             rotated[i] = new Vector2Int(-currentShape[i].y, currentShape[i].x);
 
-        if (IsValidPosition(currentPos, rotated))
-            currentShape = rotated;
+        if (IsValidPosition(currentPos, rotated)) currentShape = rotated;
     }
 
     bool IsValidPosition(Vector2Int pos, Vector2Int[] shape)
@@ -203,7 +156,6 @@ public class NewTetris : MonoBehaviour
         foreach (var block in shape)
         {
             Vector2Int p = pos + block;
-
             if (p.x < 0 || p.x >= Width) return false;
             if (p.y < 0) return false;
             if (p.y < Height && field[p.y, p.x] != 0) return false;
@@ -211,32 +163,26 @@ public class NewTetris : MonoBehaviour
         return true;
     }
 
-    void FixMino()
+    void FixPiece()
     {
         foreach (var block in currentShape)
         {
             Vector2Int p = currentPos + block;
-            if (p.y < Height)
-                field[p.y, p.x] = (int)currentType + 1;
+            if (p.y < Height) field[p.y, p.x] = currentType + 1;
         }
     }
 
-    void ClearLines()
+    int ClearLines()
     {
+        int cleared = 0;
         for (int y = 0; y < Height; y++)
         {
             bool full = true;
-            for (int x = 0; x < Width; x++)
-            {
-                if (field[y, x] == 0)
-                {
-                    full = false;
-                    break;
-                }
-            }
+            for (int x = 0; x < Width; x++) if (field[y, x] == 0) { full = false; break; }
 
             if (full)
             {
+                cleared++;
                 for (int yy = y; yy < Height - 1; yy++)
                     for (int x = 0; x < Width; x++)
                         field[yy, x] = field[yy + 1, x];
@@ -247,6 +193,7 @@ public class NewTetris : MonoBehaviour
                 y--;
             }
         }
+        return cleared;
     }
 
     void Draw()
@@ -256,27 +203,22 @@ public class NewTetris : MonoBehaviour
                 gridObjects[y, x].SetActive(false);
 
         for (int y = 0; y < Height; y++)
-        {
             for (int x = 0; x < Width; x++)
-            {
                 if (field[y, x] != 0)
                 {
                     gridObjects[y, x].SetActive(true);
                     gridObjects[y, x].GetComponent<Renderer>().material.color =
-                        minoColors[field[y, x] - 1];
+                        pieceColors[field[y, x] - 1];
                 }
-            }
-        }
 
         foreach (var block in currentShape)
         {
             Vector2Int p = currentPos + block;
-
             if (p.y < Height && p.y >= 0)
             {
                 gridObjects[p.y, p.x].SetActive(true);
                 gridObjects[p.y, p.x].GetComponent<Renderer>().material.color =
-                    minoColors[(int)currentType];
+                    pieceColors[currentType];
             }
         }
     }
