@@ -137,7 +137,15 @@ public class DropPuzzleBattle : MonoBehaviour
         else if (dir == Vector2Int.down)
         {
             FixPiece();
-            ClearLines();
+
+            int cleared = ClearLines();  // ← 受け取る
+
+            if (cleared > 0)
+            {
+                int destroyedBlocks = cleared * Width; // 横13マスなので
+                BattleMainManager.Instance.OnBlocksDestroyed(destroyedBlocks);
+            }
+
             SpawnPiece();
         }
     }

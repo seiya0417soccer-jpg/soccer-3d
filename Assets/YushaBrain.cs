@@ -4,7 +4,8 @@ using UnityEngine.AI;
 public class YushaBrain : MonoBehaviour
 {
     NavMeshAgent agent;
-    float defaultSpeed = 3f; // ’Êí‘¬“x
+    public float defaultSpeed = 3f;
+    
 
     void Start()
     {
