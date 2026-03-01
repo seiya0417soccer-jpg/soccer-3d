@@ -11,7 +11,7 @@ public class DropPuzzleBattle : MonoBehaviour
     private int[,] field = new int[Height, Width];
     private GameObject[,] gridObjects;
 
-    private const int PieceCount = 8;
+    private const int PieceCount = 9;
     private Dictionary<int, Vector2Int[]> pieceData;
 
     private Vector2Int[] currentShape;
@@ -34,7 +34,7 @@ public class DropPuzzleBattle : MonoBehaviour
         Color.magenta,
         new Color(1f, 0.5f, 0f),
         new Color(0.5f, 0f, 1f),
-        Color.white
+        Color.black
     };
 
     void Start()
@@ -98,19 +98,23 @@ public class DropPuzzleBattle : MonoBehaviour
     {
         pieceData = new Dictionary<int, Vector2Int[]>();
 
-        // 5マス（階段状のみ）
-        pieceData[0] = new Vector2Int[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1), new Vector2Int(2, 1), new Vector2Int(2, 2) };
+        pieceData[0] = new Vector2Int[] { new(0, 0), new(1, 0), new(1, 1), new(2, 1), new(2, 2) };
+        pieceData[1] = new Vector2Int[] { new(0, 0), new(1, 0), new(1, 1) };
 
-        // 3マス
-        pieceData[1] = new Vector2Int[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1) };
+        pieceData[2] = new Vector2Int[] { new(-1, 0), new(0, 0), new(1, 0), new(2, 0) };
+        pieceData[3] = new Vector2Int[] { new(-1, 0), new(0, 0), new(1, 0), new(1, 1) };
+        pieceData[4] = new Vector2Int[] { new(0, 0), new(1, 0), new(-1, 1), new(0, 1) };
+        pieceData[5] = new Vector2Int[] { new(-1, 0), new(0, 0), new(1, 0), new(0, 1) };
+        pieceData[6] = new Vector2Int[] { new(-1, 0), new(0, 0), new(1, 0), new(-1, 1) };
+        pieceData[7] = new Vector2Int[] { new(-1, 0), new(0, 0), new(0, 1), new(1, 1) };
 
-        // 4マス I,L,S,T,J,Z
-        pieceData[2] = new Vector2Int[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
-        pieceData[3] = new Vector2Int[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1) };
-        pieceData[4] = new Vector2Int[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(-1, 1), new Vector2Int(0, 1) };
-        pieceData[5] = new Vector2Int[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(0, 1) };
-        pieceData[6] = new Vector2Int[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(-1, 1) };
-        pieceData[7] = new Vector2Int[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(0, 1), new Vector2Int(1, 1) };
+        pieceData[8] = new Vector2Int[]
+        {
+            new(0,0),
+            new(1,0),
+            new(0,1),
+            new(1,1)
+        };
     }
 
     void SpawnPiece()
@@ -138,11 +142,11 @@ public class DropPuzzleBattle : MonoBehaviour
         {
             FixPiece();
 
-            int cleared = ClearLines();  // ← 受け取る
+            int cleared = ClearLines();
 
             if (cleared > 0)
             {
-                int destroyedBlocks = cleared * Width; // 横13マスなので
+                int destroyedBlocks = cleared * Width;
                 BattleMainManager.Instance.OnBlocksDestroyed(destroyedBlocks);
             }
 
@@ -156,7 +160,8 @@ public class DropPuzzleBattle : MonoBehaviour
         for (int i = 0; i < currentShape.Length; i++)
             rotated[i] = new Vector2Int(-currentShape[i].y, currentShape[i].x);
 
-        if (IsValidPosition(currentPos, rotated)) currentShape = rotated;
+        if (IsValidPosition(currentPos, rotated))
+            currentShape = rotated;
     }
 
     bool IsValidPosition(Vector2Int pos, Vector2Int[] shape)
@@ -176,21 +181,33 @@ public class DropPuzzleBattle : MonoBehaviour
         foreach (var block in currentShape)
         {
             Vector2Int p = currentPos + block;
-            if (p.y < Height) field[p.y, p.x] = currentType + 1;
+            if (p.y < Height)
+                field[p.y, p.x] = currentType + 1;
         }
     }
 
+    // ★ ここだけ爆弾対応版
     int ClearLines()
     {
         int cleared = 0;
+
         for (int y = 0; y < Height; y++)
         {
             bool full = true;
-            for (int x = 0; x < Width; x++) if (field[y, x] == 0) { full = false; break; }
+            for (int x = 0; x < Width; x++)
+                if (field[y, x] == 0) { full = false; break; }
 
             if (full)
             {
                 cleared++;
+
+                HashSet<int> bombColumns = new HashSet<int>();
+                for (int x = 0; x < Width; x++)
+                {
+                    if (field[y, x] == 9)
+                        bombColumns.Add(x);
+                }
+
                 for (int yy = y; yy < Height - 1; yy++)
                     for (int x = 0; x < Width; x++)
                         field[yy, x] = field[yy + 1, x];
@@ -198,9 +215,16 @@ public class DropPuzzleBattle : MonoBehaviour
                 for (int x = 0; x < Width; x++)
                     field[Height - 1, x] = 0;
 
+                foreach (int col in bombColumns)
+                {
+                    for (int yy = 0; yy < Height; yy++)
+                        field[yy, col] = 0;
+                }
+
                 y--;
             }
         }
+
         return cleared;
     }
 
