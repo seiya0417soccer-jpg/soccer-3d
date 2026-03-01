@@ -108,6 +108,7 @@ public class DropPuzzleBattle : MonoBehaviour
         pieceData[6] = new Vector2Int[] { new(-1, 0), new(0, 0), new(1, 0), new(-1, 1) };
         pieceData[7] = new Vector2Int[] { new(-1, 0), new(0, 0), new(0, 1), new(1, 1) };
 
+        // 爆弾（黒 O型）
         pieceData[8] = new Vector2Int[]
         {
             new(0,0),
@@ -142,11 +143,11 @@ public class DropPuzzleBattle : MonoBehaviour
         {
             FixPiece();
 
-            int cleared = ClearLines();
+            // ★ 修正版：実際に消えたマス数を取得
+            int destroyedBlocks = ClearLines();
 
-            if (cleared > 0)
+            if (destroyedBlocks > 0)
             {
-                int destroyedBlocks = cleared * Width;
                 BattleMainManager.Instance.OnBlocksDestroyed(destroyedBlocks);
             }
 
@@ -186,28 +187,44 @@ public class DropPuzzleBattle : MonoBehaviour
         }
     }
 
-    // ★ ここだけ爆弾対応版
+    // ★ 完全修正版：実際に消えたマス数を正確に返す
     int ClearLines()
     {
-        int cleared = 0;
+        int totalDestroyed = 0;
 
         for (int y = 0; y < Height; y++)
         {
             bool full = true;
             for (int x = 0; x < Width; x++)
-                if (field[y, x] == 0) { full = false; break; }
+            {
+                if (field[y, x] == 0)
+                {
+                    full = false;
+                    break;
+                }
+            }
 
             if (full)
             {
-                cleared++;
-
                 HashSet<int> bombColumns = new HashSet<int>();
+
                 for (int x = 0; x < Width; x++)
                 {
                     if (field[y, x] == 9)
                         bombColumns.Add(x);
                 }
 
+                // 横ライン削除（実在ブロックのみカウント）
+                for (int x = 0; x < Width; x++)
+                {
+                    if (field[y, x] != 0)
+                    {
+                        field[y, x] = 0;
+                        totalDestroyed++;
+                    }
+                }
+
+                // 上を下にずらす
                 for (int yy = y; yy < Height - 1; yy++)
                     for (int x = 0; x < Width; x++)
                         field[yy, x] = field[yy + 1, x];
@@ -215,17 +232,24 @@ public class DropPuzzleBattle : MonoBehaviour
                 for (int x = 0; x < Width; x++)
                     field[Height - 1, x] = 0;
 
+                // 爆弾縦爆発（穴あき対応）
                 foreach (int col in bombColumns)
                 {
                     for (int yy = 0; yy < Height; yy++)
-                        field[yy, col] = 0;
+                    {
+                        if (field[yy, col] != 0)
+                        {
+                            field[yy, col] = 0;
+                            totalDestroyed++;
+                        }
+                    }
                 }
 
                 y--;
             }
         }
 
-        return cleared;
+        return totalDestroyed;
     }
 
     void Draw()
