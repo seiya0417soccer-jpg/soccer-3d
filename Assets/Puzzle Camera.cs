@@ -4,7 +4,7 @@ using UnityEngine;
 public class CameraAutoCenter : MonoBehaviour
 {
     [Header("Board Settings")]
-    public int width = 12;
+    public int width = 13;
     public int height = 22;
 
     [Header("Board Offset")]
@@ -26,8 +26,10 @@ public class CameraAutoCenter : MonoBehaviour
     {
         float centerX = offsetX + width / 2f;
 
-        // 下端が0.5f見切れないようにする
-        float bottomEdge = offsetY; // ボードの下端
+        // ★ 修正ポイント
+        // グリッドが0.5f中心配置の場合、実際の下端は -0.5f になる
+        float bottomEdge = offsetY - 0.5f;
+
         float halfHeight = cam.orthographicSize;
 
         // カメラY位置 = 下端 + 半分の高さ

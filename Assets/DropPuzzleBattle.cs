@@ -5,7 +5,7 @@ public class DropPuzzleBattle : MonoBehaviour
 {
     public GameObject GridPrefub;
 
-    private const int Width = 15;
+    private const int Width = 13;
     private const int Height = 22;
 
     private int[,] field = new int[Height, Width];
