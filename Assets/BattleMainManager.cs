@@ -58,4 +58,11 @@ public class BattleMainManager : MonoBehaviour
         if (agent != null)
             agent.speed = yusha.defaultSpeed + bonusSpeed;
     }
+    public bool IsPaused { get; private set; }
+
+    public void SetPause(bool pause)
+    {
+        IsPaused = pause;
+        Time.timeScale = pause ? 0f : 1f;
+    }
 }
