@@ -1,20 +1,19 @@
-using UnityEngine;
 using System.Collections;
-using UnityEngine.AI;
+using UnityEngine;
 
 public class BattleMainManager : MonoBehaviour
 {
     public static BattleMainManager Instance;
 
     [Header("References")]
-    public YushaBrain yusha;
+    [SerializeField] private YushaBrain yusha;
 
     [Header("Buff Balance")]
     public float secondsPerBlock = 0.5f;
     public float speedPerBlock = 0.2f;
 
     private float bonusSpeed = 0f;
-    private NavMeshAgent agent;
+
 
     void Awake()
     {
@@ -29,12 +28,10 @@ public class BattleMainManager : MonoBehaviour
             return;
         }
 
-        agent = yusha.GetComponent<NavMeshAgent>();
     }
 
     public void OnBlocksDestroyed(int destroyedCount)
     {
-        if (agent == null) return;
 
         float duration = destroyedCount * secondsPerBlock;
         float speedAmount = destroyedCount * speedPerBlock;
@@ -55,8 +52,7 @@ public class BattleMainManager : MonoBehaviour
 
     void UpdateSpeed()
     {
-        if (agent != null)
-            agent.speed = yusha.defaultSpeed + bonusSpeed;
+        yusha.UpdateSpeed(bonusSpeed);
     }
     public bool IsPaused { get; private set; }
 

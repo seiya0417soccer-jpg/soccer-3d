@@ -5,7 +5,7 @@ public class YushaBrain : MonoBehaviour
 {
     NavMeshAgent agent;
     public float defaultSpeed = 3f;
-    
+
 
     void Start()
     {
@@ -38,4 +38,10 @@ public class YushaBrain : MonoBehaviour
             agent.SetDestination(Vector3.zero);
         }
     }
+
+    public void UpdateSpeed(float bonusSpeed)
+    {
+        agent.speed = defaultSpeed + bonusSpeed;
+    }
+
 }
