@@ -1,11 +1,13 @@
 using UnityEngine;
 using UnityEngine.AI;
+using System.Collections;
 
 public class YushaBrain : MonoBehaviour
 {
-    NavMeshAgent agent;
+    private NavMeshAgent agent;
     public float defaultSpeed = 3f;
 
+    private Coroutine debuffCoroutine;
 
     void Start()
     {
@@ -39,9 +41,29 @@ public class YushaBrain : MonoBehaviour
         }
     }
 
+    // 通常の速度バフ用
     public void UpdateSpeed(float bonusSpeed)
     {
         agent.speed = defaultSpeed + bonusSpeed;
     }
 
+    // Eキー爆弾での一時停止デバフ
+    public void ApplyEKeyDebuff(float duration)
+    {
+        if (debuffCoroutine != null)
+            StopCoroutine(debuffCoroutine);
+
+        debuffCoroutine = StartCoroutine(DebuffCoroutine(duration));
+    }
+
+    private IEnumerator DebuffCoroutine(float duration)
+    {
+        float originalSpeed = agent.speed;
+        agent.speed = 0f; // 一時停止
+
+        yield return new WaitForSeconds(duration);
+
+        agent.speed = originalSpeed; // 元の速度に戻す
+        debuffCoroutine = null;
+    }
 }

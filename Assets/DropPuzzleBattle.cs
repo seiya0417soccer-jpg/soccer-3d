@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class DropPuzzleBattle : MonoBehaviour
@@ -183,7 +184,13 @@ public class DropPuzzleBattle : MonoBehaviour
 
             int destroyedBlocks = ClearLines();
 
-            ExplodeEKeyBomb(); // E爆弾処理
+            bool eKeyHit = ExplodeEKeyBomb(); // E爆弾処理、着弾判定を返す
+
+            // 着弾していたら勇者デバフを通知（5秒停止）
+            if (eKeyHit && BattleMainManager.Instance != null)
+            {
+                BattleMainManager.Instance.ApplyEKeyDebuff(5f);
+            }
 
             DropLogicExtension logic = FindObjectOfType<DropLogicExtension>();
             if (logic != null)
@@ -199,9 +206,11 @@ public class DropPuzzleBattle : MonoBehaviour
         }
     }
 
-    void ExplodeEKeyBomb()
+    // 戻り値：Eキー爆弾が着弾したか
+    bool ExplodeEKeyBomb()
     {
         HashSet<int> verticalColumnsToExplode = new HashSet<int>();
+        bool eKeyHit = false;
 
         for (int y = 0; y < Height; y++)
         {
@@ -209,6 +218,8 @@ public class DropPuzzleBattle : MonoBehaviour
             {
                 if (field[y, x] == 10) // E爆弾
                 {
+                    eKeyHit = true;
+
                     int xStart = Mathf.Max(0, x - 2);
                     int xEnd = Mathf.Min(Width - 1, x + 2);
                     int yStart = Mathf.Max(0, y - 2);
@@ -245,15 +256,8 @@ public class DropPuzzleBattle : MonoBehaviour
                     field[yy, col] = 0;
             }
         }
-    }
 
-    void ClearVertical(int x)
-    {
-        for (int y = 0; y < Height; y++)
-        {
-            if (field[y, x] != 0)
-                field[y, x] = 0;
-        }
+        return eKeyHit;
     }
 
     void Rotate()
