@@ -1,5 +1,10 @@
 using UnityEngine;
 
+/// <summary>
+/// DropLogicExtension.cs 完全版
+/// - 設計書ルール（家系図・引数経由・直接変数操作禁止）厳守
+/// - Eキー爆弾予約フロー完全版
+/// </summary>
 public class DropLogicExtension : MonoBehaviour
 {
     [Header("References")]
@@ -19,51 +24,62 @@ public class DropLogicExtension : MonoBehaviour
     // 爆弾予約中フラグ（連打防止用）
     private bool eBombPending = false;
 
+    // ==================================================
+    // 毎フレーム更新
+    // ==================================================
     void Update()
     {
         // Eキー押下で爆弾予約
         if (Input.GetKeyDown(eKey))
         {
-            OnEKeyPressed();
+            OnEKeyPressed(); // Eキー押下時処理
         }
     }
 
-    // Eキー押下時の処理
+    // ==================================================
+    // Eキー押下時処理
+    // - 予約フラグ立て
+    // - DropPuzzleBattle側に破壊通知スキップを指示
+    // ==================================================
     void OnEKeyPressed()
     {
         // すでに爆弾予約中なら無視
         if (eBombPending)
             return;
 
-        // 爆弾予約フラグを立てる
-        eBombPending = true;
-        nextPieceIsEKeyBomb = true;
+        eBombPending = true;             // 爆弾予約中フラグON
+        nextPieceIsEKeyBomb = true;      // 次ピースをE爆弾にする
 
-        // DropPuzzleBattle側に通知して、通常の破壊通知をスキップ
+        // DropPuzzleBattleに破壊通知スキップを指示
         if (dropPuzzle != null)
             dropPuzzle.SetSkipDestroyedNotification(true);
     }
 
-    // DropPuzzleBattle から呼ばれる：次のピースの種類を取得
+    // ==================================================
+    // DropPuzzleBattleから呼ばれる：次ピースの種類取得
+    // - 次がE爆弾ならタイプ上書き
+    // ==================================================
     public int GetNextPieceType(int defaultType)
     {
-        // 次がE爆弾ならタイプを上書き
         if (nextPieceIsEKeyBomb)
         {
-            nextPieceIsEKeyBomb = false;
-            return eKeyBombType;
+            nextPieceIsEKeyBomb = false; // 1回使用したらフラグリセット
+            return eKeyBombType;          // E爆弾タイプを返す
         }
 
-        // 通常のピースタイプを返す
-        return defaultType;
+        return defaultType;               // 通常ピースタイプを返す
     }
 
-    // 爆弾処理終了時に呼ぶ：予約フラグ解除
+    // ==================================================
+    // 爆弾処理終了時に呼ぶ
+    // - 予約フラグ解除
+    // - DropPuzzleBattle側のスキップ通知も解除
+    // ==================================================
     public void OnEKeyBombFinished()
     {
-        eBombPending = false;
+        eBombPending = false;             // 予約中フラグOFF
 
-        // DropPuzzleBattle 側のスキップ通知も解除
+        // DropPuzzleBattle側の通知スキップ解除
         if (dropPuzzle != null)
             dropPuzzle.SetSkipDestroyedNotification(false);
     }
