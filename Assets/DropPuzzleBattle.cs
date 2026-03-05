@@ -3,9 +3,9 @@ using UnityEngine;
 
 /// <summary>
 /// DropPuzzleBattle.cs 完全版
-/// - 設計書ルール（家系図・引数経由・直接変数操作禁止）厳守
-/// - Eキー爆弾予約リスト方式実装済み
-/// - コメント残し
+/// - 家系図ルール・引数経由・直接変数操作禁止
+/// - Eキー爆弾5×5処理＋範囲外左右チェックによるバーティカル破壊
+/// - コメント逐一
 /// </summary>
 public class DropPuzzleBattle : MonoBehaviour
 {
@@ -22,9 +22,9 @@ public class DropPuzzleBattle : MonoBehaviour
 
     // --- ピース管理 ---
     private const int PieceCount = 10;                     // ピース種類数
-    private Dictionary<int, Vector2Int[]> pieceData;       // ピースの形状データ
+    private Dictionary<int, Vector2Int[]> pieceData;       // ピース形状データ
 
-    public event System.Action OnPieceFixed;              // ピース固定時に通知するイベント
+    public event System.Action OnPieceFixed;              // ピース固定時のイベント
 
     private Vector2Int[] currentShape;                     // 落下中ピースの形状
     private Vector2Int currentPos;                         // 落下中ピースの位置
@@ -59,15 +59,15 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     void Start()
     {
-        // --- グリッドオブジェクト生成 ---
+        // グリッドオブジェクト生成
         gridObjects = new GameObject[Height, Width];
         for (int y = 0; y < Height; y++)
             for (int x = 0; x < Width; x++)
             {
                 GameObject obj = Instantiate(GridPrefub);
                 obj.transform.position = new Vector3(x + offsetX, y + offsetY, 0);
-                obj.SetActive(false);             // 最初は非表示
-                gridObjects[y, x] = obj;          // 配列に格納
+                obj.SetActive(false);
+                gridObjects[y, x] = obj;
             }
 
         CreateWall();   // 壁生成
@@ -105,21 +105,20 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     void Update()
     {
-        fallTimer += Time.deltaTime;                             // 落下タイマー加算
-        float speed = Input.GetKey(KeyCode.S) ? 0.05f : fallInterval; // Sキー押下で高速落下
+        fallTimer += Time.deltaTime;
+        float speed = Input.GetKey(KeyCode.S) ? 0.05f : fallInterval;
 
         if (fallTimer >= speed)
         {
             fallTimer = 0;
-            Move(Vector2Int.down);                              // 下に移動
+            Move(Vector2Int.down);  // 下に移動
         }
 
-        // 左右移動
-        if (Input.GetKeyDown(KeyCode.A)) Move(Vector2Int.left);
-        if (Input.GetKeyDown(KeyCode.D)) Move(Vector2Int.right);
-        if (Input.GetKeyDown(KeyCode.W)) Rotate();             // 回転
+        if (Input.GetKeyDown(KeyCode.A)) Move(Vector2Int.left);   // 左
+        if (Input.GetKeyDown(KeyCode.D)) Move(Vector2Int.right);  // 右
+        if (Input.GetKeyDown(KeyCode.W)) Rotate();                // 回転
 
-        Draw();                                                 // 描画更新
+        Draw(); // 描画更新
     }
 
     // ==================================================
@@ -128,7 +127,6 @@ public class DropPuzzleBattle : MonoBehaviour
     void InitPieces()
     {
         pieceData = new Dictionary<int, Vector2Int[]>();
-        // 各ピースを座標配列で定義
         pieceData[0] = new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1), new Vector2Int(2, 1), new Vector2Int(2, 2) };
         pieceData[1] = new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1) };
         pieceData[2] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
@@ -138,7 +136,7 @@ public class DropPuzzleBattle : MonoBehaviour
         pieceData[6] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(-1, 1) };
         pieceData[7] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(0, 1), new Vector2Int(1, 1) };
         pieceData[8] = new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(0, 1), new Vector2Int(1, 1) };
-        pieceData[9] = new[] { new Vector2Int(0, 0) };          // 1マスブロック
+        pieceData[9] = new[] { new Vector2Int(0, 0) };
     }
 
     // ==================================================
@@ -147,10 +145,8 @@ public class DropPuzzleBattle : MonoBehaviour
     void SpawnPiece()
     {
         pieceSpawnCount++;
+        DropLogicExtension logic = FindObjectOfType<DropLogicExtension>();
 
-        DropLogicExtension logic = FindObjectOfType<DropLogicExtension>(); // E爆弾予約取得用
-
-        // 強制指定があれば優先
         if (forcedNextPieceType != -1)
         {
             currentType = forcedNextPieceType;
@@ -158,20 +154,17 @@ public class DropPuzzleBattle : MonoBehaviour
         }
         else
         {
-            // デフォルトピース生成
             int interval = pieceSpawnCount < 30 ? 10 : 7;
             int defaultType = (pieceSpawnCount % interval == 0) ? 8 : Random.Range(0, 8);
-
             if (logic != null)
-                currentType = logic.GetNextPieceType(defaultType); // E爆弾予約考慮
+                currentType = logic.GetNextPieceType(defaultType);
             else
                 currentType = defaultType;
         }
 
         currentShape = pieceData[currentType];
-        currentPos = new Vector2Int(Width / 2, Height - 2); // 出現位置（上中央）
+        currentPos = new Vector2Int(Width / 2, Height - 2);
 
-        // 出現できなければゲームオーバー
         if (!IsValidPosition(currentPos, currentShape))
         {
             Debug.Log("Game Over");
@@ -188,38 +181,30 @@ public class DropPuzzleBattle : MonoBehaviour
 
         if (IsValidPosition(newPos, currentShape))
         {
-            currentPos = newPos; // 移動可能なら更新
+            currentPos = newPos;
         }
         else if (dir == Vector2Int.down)
         {
-            // 下に移動できない場合 → ピース固定
             FixPiece();
+            int destroyedBlocks = ClearLines();
+            bool eKeyHit = ExplodeEKeyBombWithReservation(); // 新ロジック
 
-            int destroyedBlocks = ClearLines();                  // ライン消去
-            bool eKeyHit = ExplodeEKeyBombWithReservation();    // E爆弾処理（予約リスト方式）
-
-            // E爆弾ヒット時に勇者デバフ適用
             if (eKeyHit && BattleMainManager.Instance != null)
-            {
-                BattleMainManager.Instance.ApplyEKeyDebuff(5f); // 5秒停止
-            }
+                BattleMainManager.Instance.ApplyEKeyDebuff(5f);
 
             DropLogicExtension logic = FindObjectOfType<DropLogicExtension>();
             if (logic != null)
-                logic.OnEKeyBombFinished();                      // E爆弾処理完了通知
+                logic.OnEKeyBombFinished();
 
-            if (!skipDestroyedNotification)
-            {
-                if (destroyedBlocks > 0 && BattleMainManager.Instance != null)
-                    BattleMainManager.Instance.OnBlocksDestroyed(destroyedBlocks); // ブロック破壊通知
-            }
+            if (!skipDestroyedNotification && destroyedBlocks > 0 && BattleMainManager.Instance != null)
+                BattleMainManager.Instance.OnBlocksDestroyed(destroyedBlocks);
 
-            SpawnPiece(); // 次ピース生成
+            SpawnPiece();
         }
     }
 
     // ==================================================
-    // Eキー爆弾処理（予約リスト方式）
+    // E爆弾処理（5×5 + 隣マスチェックによる縦爆弾消去）
     // ==================================================
     bool ExplodeEKeyBombWithReservation()
     {
@@ -227,65 +212,74 @@ public class DropPuzzleBattle : MonoBehaviour
         HashSet<int> verticalColumnsToExplode = new HashSet<int>();
         bool eKeyHit = false;
 
+        // フィールド全体を探索
         for (int y = 0; y < Height; y++)
         {
             for (int x = 0; x < Width; x++)
             {
-                if (field[y, x] == 10) // E爆弾を検出
+                if (field[y, x] == 10) // E爆弾
                 {
                     eKeyHit = true;
 
+                    // 5x5爆破範囲
                     int xStart = Mathf.Max(0, x - 2);
                     int xEnd = Mathf.Min(Width - 1, x + 2);
                     int yStart = Mathf.Max(0, y - 2);
                     int yEnd = Mathf.Min(Height - 1, y + 2);
 
-                    // 範囲内を予約
+                    // まず範囲内を予約
                     for (int yy = yStart; yy <= yEnd; yy++)
                         for (int xx = xStart; xx <= xEnd; xx++)
                         {
                             eKeyBombPositions.Add(new Vector2Int(xx, yy));
-                            if (field[yy, xx] == 9) // 縦爆弾検出
-                                verticalColumnsToExplode.Add(xx);
+
+                            // 縦爆弾確認
+                            if (field[yy, xx] == 9)
+                            {
+                                // 左右隣チェック（範囲外も含む）
+                                bool leftBlack = (xx - 1 >= 0 && field[yy, xx - 1] == 9);
+                                bool rightBlack = (xx + 1 < Width && field[yy, xx + 1] == 9);
+
+                                if (leftBlack) verticalColumnsToExplode.Add(xx - 1); // 左隣列も縦消去
+                                if (rightBlack) verticalColumnsToExplode.Add(xx + 1); // 右隣列も縦消去
+                                verticalColumnsToExplode.Add(xx);                     // 自身の列縦消去
+                            }
                         }
 
-                    field[y, x] = 0; // 爆弾自身を消去
+                    field[y, x] = 0; // 爆弾自身消去
                 }
             }
         }
 
-        // 予約リストで範囲内消去
+        // 予約リスト消去
         foreach (var pos in eKeyBombPositions)
-        {
             if (field[pos.y, pos.x] != 0)
                 field[pos.y, pos.x] = 0;
-        }
 
-        // バーティカル列も上下全消去
+        // 縦列消去
         foreach (int col in verticalColumnsToExplode)
             for (int yy = 0; yy < Height; yy++)
                 if (field[yy, col] != 0)
                     field[yy, col] = 0;
 
-        return eKeyHit; // E爆弾がヒットしたか
+        return eKeyHit;
     }
 
     // ==================================================
-    // 回転処理
+    // 回転
     // ==================================================
     void Rotate()
     {
         Vector2Int[] rotated = new Vector2Int[currentShape.Length];
-
         for (int i = 0; i < currentShape.Length; i++)
-            rotated[i] = new Vector2Int(-currentShape[i].y, currentShape[i].x); // 90°回転
+            rotated[i] = new Vector2Int(-currentShape[i].y, currentShape[i].x);
 
         if (IsValidPosition(currentPos, rotated))
             currentShape = rotated;
     }
 
     // ==================================================
-    // 位置有効判定
+    // 有効位置判定
     // ==================================================
     bool IsValidPosition(Vector2Int pos, Vector2Int[] shape)
     {
@@ -308,14 +302,14 @@ public class DropPuzzleBattle : MonoBehaviour
         {
             Vector2Int p = currentPos + block;
             if (p.y >= 0 && p.y < Height)
-                field[p.y, p.x] = currentType + 1; // 固定ブロックをフィールドに書き込み
+                field[p.y, p.x] = currentType + 1;
         }
 
-        OnPieceFixed?.Invoke(); // イベント通知
+        OnPieceFixed?.Invoke();
     }
 
     // ==================================================
-    // ライン消去処理
+    // ライン消去
     // ==================================================
     int ClearLines()
     {
@@ -324,62 +318,43 @@ public class DropPuzzleBattle : MonoBehaviour
         for (int y = 0; y < Height; y++)
         {
             bool full = true;
-
             for (int x = 0; x < Width; x++)
-                if (field[y, x] == 0)
-                {
-                    full = false; // 空きあり
-                    break;
-                }
-
+                if (field[y, x] == 0) { full = false; break; }
             if (!full) continue;
 
             HashSet<int> bombColumns = new HashSet<int>();
+            for (int x = 0; x < Width; x++)
+                if (field[y, x] == 9) bombColumns.Add(x);
 
             for (int x = 0; x < Width; x++)
-                if (field[y, x] == 9)
-                    bombColumns.Add(x); // 縦爆弾列を記録
+                if (field[y, x] != 0) { field[y, x] = 0; totalDestroyed++; }
 
-            // ライン消去
-            for (int x = 0; x < Width; x++)
-                if (field[y, x] != 0)
-                {
-                    field[y, x] = 0;
-                    totalDestroyed++;
-                }
-
-            // 上の行を落とす
             for (int yy = y; yy < Height - 1; yy++)
                 for (int x = 0; x < Width; x++)
                     field[yy, x] = field[yy + 1, x];
 
-            // 最上行は空に
             for (int x = 0; x < Width; x++)
                 field[Height - 1, x] = 0;
 
-            // 縦爆弾列も上下全消去
             foreach (int col in bombColumns)
                 for (int yy = 0; yy < Height; yy++)
-                    if (field[yy, col] != 0)
-                        field[yy, col] = 0;
+                    if (field[yy, col] != 0) field[yy, col] = 0;
 
-            y--; // 次行も確認
+            y--;
         }
 
         return totalDestroyed;
     }
 
     // ==================================================
-    // 描画処理
+    // 描画
     // ==================================================
     void Draw()
     {
-        // 一旦全て非表示
         for (int y = 0; y < Height; y++)
             for (int x = 0; x < Width; x++)
                 gridObjects[y, x].SetActive(false);
 
-        // 固定ブロック描画
         for (int y = 0; y < Height; y++)
             for (int x = 0; x < Width; x++)
                 if (field[y, x] != 0)
@@ -388,11 +363,9 @@ public class DropPuzzleBattle : MonoBehaviour
                     gridObjects[y, x].GetComponent<Renderer>().material.color = pieceColors[field[y, x] - 1];
                 }
 
-        // 落下中ブロック描画
         foreach (var block in currentShape)
         {
             Vector2Int p = currentPos + block;
-
             if (p.y >= 0 && p.y < Height)
             {
                 gridObjects[p.y, p.x].SetActive(true);
