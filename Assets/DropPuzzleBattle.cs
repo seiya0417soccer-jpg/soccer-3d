@@ -11,7 +11,7 @@ public class DropPuzzleBattle : MonoBehaviour
     private int[,] field = new int[Height, Width];
     private GameObject[,] gridObjects;
 
-    private const int PieceCount = 9;
+    private const int PieceCount = 10;
     private Dictionary<int, Vector2Int[]> pieceData;
 
     public event System.Action OnPieceFixed;
@@ -26,8 +26,12 @@ public class DropPuzzleBattle : MonoBehaviour
     private float offsetX = 100f;
     private float offsetY = 0f;
 
-    // ★ 追加：出現カウント
+    // ★ 出現カウント
     private int pieceSpawnCount = 0;
+
+    // ★ 追加：E爆弾制御
+    private bool skipDestroyedNotification = false;
+    private int forcedNextPieceType = -1;
 
     private Color[] pieceColors =
     {
@@ -39,6 +43,7 @@ public class DropPuzzleBattle : MonoBehaviour
         Color.magenta,
         new Color(1f, 0.5f, 0f),
         new Color(0.5f, 0f, 1f),
+        Color.black,
         Color.black
     };
 
@@ -113,7 +118,6 @@ public class DropPuzzleBattle : MonoBehaviour
         pieceData[6] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(-1, 1) };
         pieceData[7] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(0, 1), new Vector2Int(1, 1) };
 
-        // 爆弾
         pieceData[8] = new[]
         {
             new Vector2Int(0,0),
@@ -121,21 +125,41 @@ public class DropPuzzleBattle : MonoBehaviour
             new Vector2Int(0,1),
             new Vector2Int(1,1)
         };
+        // Eキー爆弾（1マス）
+        pieceData[9] = new[]
+        {
+    new Vector2Int(0,0)
+};
     }
 
     void SpawnPiece()
     {
         pieceSpawnCount++;
 
-        int interval = pieceSpawnCount < 30 ? 10 : 7;
+        // ★ Logic拡張を取得
+        DropLogicExtension logic = FindObjectOfType<DropLogicExtension>();
 
-        if (pieceSpawnCount % interval == 0)
+        if (forcedNextPieceType != -1)
         {
-            currentType = 8; // 爆弾確定
+            currentType = forcedNextPieceType;
+            forcedNextPieceType = -1;
         }
         else
         {
-            currentType = Random.Range(0, 8); // 通常ピースのみ
+            int interval = pieceSpawnCount < 30 ? 10 : 7;
+
+            int defaultType;
+
+            if (pieceSpawnCount % interval == 0)
+                defaultType = 8;
+            else
+                defaultType = Random.Range(0, 8);
+
+            // ★ Logicに最終決定を渡す
+            if (logic != null)
+                currentType = logic.GetNextPieceType(defaultType);
+            else
+                currentType = defaultType;
         }
 
         currentShape = pieceData[currentType];
@@ -162,8 +186,12 @@ public class DropPuzzleBattle : MonoBehaviour
 
             int destroyedBlocks = ClearLines();
 
-            if (destroyedBlocks > 0 && BattleMainManager.Instance != null)
-                BattleMainManager.Instance.OnBlocksDestroyed(destroyedBlocks);
+            // ★ 修正：E爆弾時はバフ送信しない
+            if (!skipDestroyedNotification)
+            {
+                if (destroyedBlocks > 0 && BattleMainManager.Instance != null)
+                    BattleMainManager.Instance.OnBlocksDestroyed(destroyedBlocks);
+            }
 
             SpawnPiece();
         }
@@ -288,5 +316,19 @@ public class DropPuzzleBattle : MonoBehaviour
                     pieceColors[currentType];
             }
         }
+    }
+
+    // =========================
+    // 外部スクリプト用の窓口
+    // =========================
+
+    public void SetSkipDestroyedNotification(bool value)
+    {
+        skipDestroyedNotification = value;
+    }
+
+    public void ForceNextPieceType(int type)
+    {
+        forcedNextPieceType = type;
     }
 }
