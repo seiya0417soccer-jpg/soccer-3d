@@ -26,10 +26,8 @@ public class DropPuzzleBattle : MonoBehaviour
     private float offsetX = 100f;
     private float offsetY = 0f;
 
-    // ★ 出現カウント
     private int pieceSpawnCount = 0;
 
-    // ★ 追加：E爆弾制御
     private bool skipDestroyedNotification = false;
     private int forcedNextPieceType = -1;
 
@@ -125,18 +123,18 @@ public class DropPuzzleBattle : MonoBehaviour
             new Vector2Int(0,1),
             new Vector2Int(1,1)
         };
-        // Eキー爆弾（1マス）
+
+        // Eキー爆弾
         pieceData[9] = new[]
         {
-    new Vector2Int(0,0)
-};
+            new Vector2Int(0,0)
+        };
     }
 
     void SpawnPiece()
     {
         pieceSpawnCount++;
 
-        // ★ Logic拡張を取得
         DropLogicExtension logic = FindObjectOfType<DropLogicExtension>();
 
         if (forcedNextPieceType != -1)
@@ -155,7 +153,6 @@ public class DropPuzzleBattle : MonoBehaviour
             else
                 defaultType = Random.Range(0, 8);
 
-            // ★ Logicに最終決定を渡す
             if (logic != null)
                 currentType = logic.GetNextPieceType(defaultType);
             else
@@ -186,7 +183,12 @@ public class DropPuzzleBattle : MonoBehaviour
 
             int destroyedBlocks = ClearLines();
 
-            // ★ 修正：E爆弾時はバフ送信しない
+            ExplodeEKeyBomb(); // E爆弾処理
+
+            DropLogicExtension logic = FindObjectOfType<DropLogicExtension>();
+            if (logic != null)
+                logic.OnEKeyBombFinished();
+
             if (!skipDestroyedNotification)
             {
                 if (destroyedBlocks > 0 && BattleMainManager.Instance != null)
@@ -194,6 +196,63 @@ public class DropPuzzleBattle : MonoBehaviour
             }
 
             SpawnPiece();
+        }
+    }
+
+    void ExplodeEKeyBomb()
+    {
+        HashSet<int> verticalColumnsToExplode = new HashSet<int>();
+
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                if (field[y, x] == 10) // E爆弾
+                {
+                    int xStart = Mathf.Max(0, x - 2);
+                    int xEnd = Mathf.Min(Width - 1, x + 2);
+                    int yStart = Mathf.Max(0, y - 2);
+                    int yEnd = Mathf.Min(Height - 1, y + 2);
+
+                    // 5x5範囲を消去
+                    for (int yy = yStart; yy <= yEnd; yy++)
+                    {
+                        for (int xx = xStart; xx <= xEnd; xx++)
+                        {
+                            // 通常ブロックは消去
+                            if (field[yy, xx] != 9)
+                                field[yy, xx] = 0;
+
+                            // バーティカル爆弾を巻き込んだ場合、左右列を覚えておく
+                            if (field[yy, xx] == 9)
+                            {
+                                verticalColumnsToExplode.Add(xx);
+                            }
+                        }
+                    }
+
+                    field[y, x] = 0; // 自身のE爆弾消去
+                }
+            }
+        }
+
+        // バーティカル爆弾の列を上下全て消去
+        foreach (int col in verticalColumnsToExplode)
+        {
+            for (int yy = 0; yy < Height; yy++)
+            {
+                if (field[yy, col] != 0)
+                    field[yy, col] = 0;
+            }
+        }
+    }
+
+    void ClearVertical(int x)
+    {
+        for (int y = 0; y < Height; y++)
+        {
+            if (field[y, x] != 0)
+                field[y, x] = 0;
         }
     }
 
@@ -277,10 +336,7 @@ public class DropPuzzleBattle : MonoBehaviour
                 for (int yy = 0; yy < Height; yy++)
                 {
                     if (field[yy, col] != 0)
-                    {
                         field[yy, col] = 0;
-                        totalDestroyed++;
-                    }
                 }
             }
 
@@ -317,10 +373,6 @@ public class DropPuzzleBattle : MonoBehaviour
             }
         }
     }
-
-    // =========================
-    // 外部スクリプト用の窓口
-    // =========================
 
     public void SetSkipDestroyedNotification(bool value)
     {

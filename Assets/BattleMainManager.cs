@@ -9,7 +9,7 @@ public class BattleMainManager : MonoBehaviour
     [SerializeField] private YushaBrain yusha;
 
     [Header("Buff Balance")]
-    public float secondsPerBlock = 0.5f;
+    public float secondsPerBlock = 0.3f;
     public float speedPerBlock = 0.2f;
 
     private float bonusSpeed = 0f;
