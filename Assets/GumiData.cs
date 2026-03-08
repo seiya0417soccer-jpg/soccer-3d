@@ -3,7 +3,8 @@ using UnityEngine;
 
 public class GumiData
 {
-    private Dictionary<int, Vector2Int[]> pieceData;       // ピース形状データ
+    public Dictionary<int, Vector2Int[]> pieceData;       // ピース形状データ
+    public int PieceCount => pieceData.Count;                    // ピース種類数
     public GumiData()
     {
         InitPieces();
@@ -25,5 +26,14 @@ public class GumiData
         pieceData[8] = new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(0, 1), new Vector2Int(1, 1) };
         pieceData[9] = new[] { new Vector2Int(0, 0) };
     }
+
+    // --- ピースカラー ---
+    public Color[] pieceColors = 
+    {
+        Color.cyan, Color.blue, Color.green, Color.red, Color.yellow,
+        Color.magenta, new Color(1f, 0.5f, 0f), new Color(0.5f, 0f, 1f),
+        Color.black, Color.black
+    };
+
 
 }
