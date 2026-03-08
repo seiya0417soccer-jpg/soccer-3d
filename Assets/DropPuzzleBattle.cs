@@ -24,8 +24,9 @@ public class DropPuzzleBattle : MonoBehaviour
         Piece6 = 6,  // 通常ピース6
         Piece7 = 7,  // 通常ピース7
         Piece8 = 8,  // 通常ピース8
-        CrossBomb = 9,  // 十字爆弾
-        EKeyBomb = 10, // Eキー爆弾（5×5範囲）
+        Piece9 = 9,  // 通常ピース9（白・旧CrossBomb形状）
+        CrossBomb = 10, // 十字爆弾（1マス・黒）
+        EKeyBomb = 11, // Eキー爆弾（5×5範囲）
     }
 
     // --- Prefab ---
@@ -63,7 +64,7 @@ public class DropPuzzleBattle : MonoBehaviour
     private bool skipDestroyedNotification = false;
     private int forcedNextPieceType = -1;
 
-    [SerializeField, Range(0f, 1f)] private float crossBombSpawnChance = 0.1f; // 十字爆弾の出現確率
+    [SerializeField, Range(0f, 1f)] private float crossBombChance = 0.1f; // 各マスがCrossBombになる確率
 
     private Color[] pieceColors => gumiData.pieceColors;
 
@@ -141,11 +142,14 @@ public class DropPuzzleBattle : MonoBehaviour
         Draw();
     }
 
+    private HashSet<int> crossBombBlockIndices = new HashSet<int>(); // 落下中にCrossBombになってるマスのインデックス
+
     // ==================================================
     // ピース生成
     // ==================================================
     void SpawnPiece()
     {
+        crossBombBlockIndices.Clear();
 
         if (forcedNextPieceType != -1)
         {
@@ -154,14 +158,20 @@ public class DropPuzzleBattle : MonoBehaviour
         }
         else
         {
-            // 十字爆弾の出現確率（0〜1、Inspectorから設定可能）
-            int defaultType = (Random.value < crossBombSpawnChance) ? 8 : Random.Range(0, 8);
+            // 通常ピースからランダムに選択（Piece9=白を含む0〜8）
+            int defaultType = Random.Range(0, 9);
             currentType = cachedLogic != null
                 ? cachedLogic.GetNextPieceType(defaultType)
                 : defaultType;
         }
 
         currentShape = pieceData[currentType];
+
+        // 各マスを確率でCrossBombとしてマーク
+        for (int i = 0; i < currentShape.Length; i++)
+            if (Random.value < crossBombChance)
+                crossBombBlockIndices.Add(i);
+
         currentPos = new Vector2Int(wide / 2, hight - 2);
 
         if (!IsValidPosition(currentPos, currentShape))
@@ -342,11 +352,15 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     void FixPiece()
     {
-        foreach (var block in currentShape)
+        for (int i = 0; i < currentShape.Length; i++)
         {
-            Vector2Int p = currentPos + block;
-            if (p.y >= 0 && p.y < hight)
-                field[p.y, p.x] = (BlockType)(currentType + 1);
+            Vector2Int p = currentPos + currentShape[i];
+            if (p.y < 0 || p.y >= hight) continue;
+
+            // CrossBombとしてマークされていればCrossBomb(10)、それ以外は通常ブロック
+            field[p.y, p.x] = crossBombBlockIndices.Contains(i)
+                ? BlockType.CrossBomb
+                : (BlockType)(currentType + 1);
         }
 
         OnPieceFixed?.Invoke();
@@ -419,18 +433,33 @@ public class DropPuzzleBattle : MonoBehaviour
                 else
                 {
                     gridObjects[y, x].SetActive(true);
-                    gridRenderers[y, x].material.color = pieceColors[(int)field[y, x] - 1];
+                    if (field[y, x] == BlockType.CrossBomb)
+                        gridRenderers[y, x].material.color = Color.black;       // 十字爆弾は黒
+                    else if (field[y, x] == BlockType.Piece9)
+                        gridRenderers[y, x].material.color = Color.white;       // Piece9は白
+                    else
+                        gridRenderers[y, x].material.color = pieceColors[(int)field[y, x] - 1];
                 }
             }
         }
 
-        foreach (var block in currentShape)
+        // 落下中ピース描画（CrossBombマスは黒で表示）
+        for (int i = 0; i < currentShape.Length; i++)
         {
-            Vector2Int p = currentPos + block;
+            Vector2Int p = currentPos + currentShape[i];
             if (p.y >= 0 && p.y < hight)
             {
                 gridObjects[p.y, p.x].SetActive(true);
-                gridRenderers[p.y, p.x].material.color = pieceColors[currentType];
+
+                Color blockColor;
+                if (crossBombBlockIndices.Contains(i))
+                    blockColor = Color.black;                        // CrossBombマスは黒（Piece9含む）
+                else if (currentType == (int)BlockType.Piece9 - 1)
+                    blockColor = Color.white;                        // Piece9の通常マスは白
+                else
+                    blockColor = pieceColors[currentType];           // 通常ピースはピースカラー
+
+                gridRenderers[p.y, p.x].material.color = blockColor;
             }
         }
     }

@@ -1,103 +1,122 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class BattleMainManager : MonoBehaviour
 {
-    // シングルトンインスタンス
     public static BattleMainManager Instance;
 
     [Header("References")]
-    [SerializeField] private YushaBrain yusha; // 勇者の参照
+    [SerializeField] private YushaBrain yusha;
 
     [Header("Buff Balance")]
-    public float secondsPerBlock = 0.3f; // 破壊ブロック1個あたりのバフ持続時間
-    public float speedPerBlock = 0.2f;   // 破壊ブロック1個あたりの速度バフ量
+    public float secondsPerBlock = 0.3f; // ブロック1個あたりのバフ持続時間
+    public float speedPerBlock = 0.2f; // ブロック1個あたりの速度バフ量
 
-    // 現在のバフ量
-    private float bonusSpeed = 0f;
+    // 現在有効なバフエントリのリスト（amount, 残り時間）
+    private List<BuffEntry> activeBuffs = new List<BuffEntry>();
 
-    // Eキー爆弾デバフ用コルーチン参照
+    // デバフ中フラグ
+    private bool isEKeyDebuffActive = false;
     private Coroutine eKeyDebuffCoroutine;
+
+    // バフの総量（activeBuffsから都度計算）
+    private float TotalBonusSpeed
+    {
+        get
+        {
+            float total = 0f;
+            foreach (var b in activeBuffs) total += b.amount;
+            return total;
+        }
+    }
 
     void Awake()
     {
-        // シングルトン登録
         Instance = this;
     }
 
     void Start()
     {
-        // 勇者参照が未設定なら警告
         if (yusha == null)
-        {
             Debug.LogError("Yusha がセットされていません！");
-            return;
-        }
     }
 
-    // 通常ブロック破壊時に呼ばれる処理（速度バフ付与）
+    // ==================================================
+    // 通常ブロック破壊時（速度バフ付与）
+    // ==================================================
     public void OnBlocksDestroyed(int destroyedCount)
     {
-        float duration = destroyedCount * secondsPerBlock; // 持続時間計算
-        float speedAmount = destroyedCount * speedPerBlock; // 速度量計算
-
-        StartCoroutine(SpeedBuff(duration, speedAmount));
+        float duration = destroyedCount * secondsPerBlock;
+        float speedAmount = destroyedCount * speedPerBlock;
+        StartCoroutine(SpeedBuffCoroutine(duration, speedAmount));
     }
 
-    // 一定時間速度バフを適用
-    IEnumerator SpeedBuff(float duration, float amount)
+    // バフを1件追加 → 時間経過後に除去
+    IEnumerator SpeedBuffCoroutine(float duration, float amount)
     {
-        bonusSpeed += amount; // バフ加算
-        UpdateSpeed();         // 勇者速度更新
+        var entry = new BuffEntry(amount);
+        activeBuffs.Add(entry);
+        ApplySpeed(); // バフ追加後に速度反映
 
-        yield return new WaitForSeconds(duration); // バフ持続待機
+        yield return new WaitForSeconds(duration);
 
-        bonusSpeed -= amount; // バフ解除
-        UpdateSpeed();        // 勇者速度更新
+        activeBuffs.Remove(entry);
+        ApplySpeed(); // バフ除去後に速度反映
     }
 
-    // Eキー爆弾用デバフ（一定時間勇者を停止）
+    // ==================================================
+    // Eキー爆弾デバフ（一定時間停止）
+    // ==================================================
     public void ApplyEKeyDebuff(float duration)
     {
-        // すでにデバフ中なら停止して再開始
         if (eKeyDebuffCoroutine != null)
             StopCoroutine(eKeyDebuffCoroutine);
-
         eKeyDebuffCoroutine = StartCoroutine(EKeyDebuffCoroutine(duration));
     }
 
-    private IEnumerator EKeyDebuffCoroutine(float duration)
+    IEnumerator EKeyDebuffCoroutine(float duration)
     {
-        if (yusha == null)
-            yield break;
+        if (yusha == null) yield break;
 
-        // 現在のバフ量を保持
-        float currentBonus = bonusSpeed;
+        isEKeyDebuffActive = true;
+        yusha.UpdateSpeed(-yusha.defaultSpeed); // 勇者を停止
 
-        // 勇者を停止（基本速度+バフを0にして一時停止）
-        yusha.UpdateSpeed(-yusha.defaultSpeed);
+        yield return new WaitForSeconds(duration);
 
-        yield return new WaitForSeconds(duration); // デバフ時間待機
-
-        // デバフ解除、元の速度に戻す
-        yusha.UpdateSpeed(currentBonus);
+        isEKeyDebuffActive = false;
         eKeyDebuffCoroutine = null;
+        ApplySpeed(); // デバフ解除後、現在のバフ量を反映
     }
 
+    // ==================================================
     // 現在のバフ量を勇者に反映
-    void UpdateSpeed()
+    // デバフ中は無視（デバフ解除時に ApplySpeed が呼ばれる）
+    // ==================================================
+    void ApplySpeed()
     {
-        if (yusha != null)
-            yusha.UpdateSpeed(bonusSpeed);
+        if (yusha == null) return;
+        if (isEKeyDebuffActive) return; // デバフ中はバフを反映しない
+        yusha.UpdateSpeed(TotalBonusSpeed);
     }
 
-    // ゲーム一時停止状態の取得
+    // ==================================================
+    // 一時停止
+    // ==================================================
     public bool IsPaused { get; private set; }
 
-    // ゲーム一時停止・解除
     public void SetPause(bool pause)
     {
         IsPaused = pause;
-        Time.timeScale = pause ? 0f : 1f; // Unity時間を停止／再開
+        Time.timeScale = pause ? 0f : 1f;
+    }
+
+    // ==================================================
+    // バフエントリ（参照で管理するためクラスを使用）
+    // ==================================================
+    private class BuffEntry
+    {
+        public float amount;
+        public BuffEntry(float amount) { this.amount = amount; }
     }
 }

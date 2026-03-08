@@ -12,7 +12,7 @@ public class CameraAutoCenter : MonoBehaviour
     public float offsetY = 0f;
 
     [Header("Camera Settings")]
-    public float cameraZ = -40f;
+    public float cameraZ = 0f;
 
     private Camera cam;
 
