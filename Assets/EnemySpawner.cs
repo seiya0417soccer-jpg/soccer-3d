@@ -6,7 +6,7 @@ public class EnemySpawner : MonoBehaviour
     public GameObject enemyPrefab;
 
     [SerializeField] private int maxEnemies = 3;    // 同時に存在する敵の最大数
-    [SerializeField] private float spawnRange = 14f;  // スポーン範囲
+    [SerializeField] private float spawnRange = 11f;  // スポーン範囲
 
     // 生存中の敵リスト
     private List<GameObject> enemies = new List<GameObject>();
