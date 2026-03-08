@@ -188,6 +188,7 @@ public class DropPuzzleBattle : MonoBehaviour
             FixPiece();
             int destroyedBlocks = ClearLines();
             bool bombHit = ExplodeBombs();
+            ApplyGravity(); // 爆発・消去後の浮きブロックを落下させる
 
             if (bombHit && BattleMainManager.Instance != null)
                 BattleMainManager.Instance.ApplyEKeyDebuff(5f);
@@ -198,6 +199,38 @@ public class DropPuzzleBattle : MonoBehaviour
                 BattleMainManager.Instance.OnBlocksDestroyed(destroyedBlocks);
 
             SpawnPiece();
+        }
+    }
+
+    // ==================================================
+    // 行シフト処理
+    //
+    // 空行（y行のx=0〜wide-1が全てEmpty）を見つけたら、
+    // その行より上の全ブロックを1行分下にずらす。
+    // これをhight回繰り返すことで複数の空行も解消される。
+    // ==================================================
+    void ApplyGravity()
+    {
+        for (int repeat = 0; repeat < hight; repeat++)
+        {
+            for (int y = 0; y < hight - 1; y++)
+            {
+                // y行が空行か確認
+                bool isEmpty = true;
+                for (int x = 0; x < wide; x++)
+                    if (field[y, x] != BlockType.Empty) { isEmpty = false; break; }
+
+                if (!isEmpty) continue;
+
+                // 空行より上を1行分下にずらす
+                for (int yy = y; yy < hight - 1; yy++)
+                    for (int x = 0; x < wide; x++)
+                        field[yy, x] = field[yy + 1, x];
+
+                // 一番上の行を空にする
+                for (int x = 0; x < wide; x++)
+                    field[hight - 1, x] = BlockType.Empty;
+            }
         }
     }
 
