@@ -5,7 +5,7 @@ using UnityEngine.AI;
 public class YushaBrain : MonoBehaviour
 {
     private NavMeshAgent agent;
-    public float defaultSpeed = 3f;
+    public float defaultSpeed = 2f;
 
     private Coroutine debuffCoroutine;
 

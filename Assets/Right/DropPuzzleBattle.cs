@@ -196,10 +196,14 @@ public class DropPuzzleBattle : MonoBehaviour
         {
             FixPiece();
             int destroyedBlocks = ClearLines();
-            bool bombHit = ExplodeBombs();
-            ApplyGravity(); // 爆発・消去後の浮きブロックを落下させる
+            int bombDestroyed = ExplodeBombs();
+            Debug.Log("destroyedBlocks: " + destroyedBlocks);
+            Debug.Log("bombDestroyed: " + bombDestroyed);
+            bool eKeyHit = bombDestroyed > 0;
+            destroyedBlocks += bombDestroyed;
+            ApplyGravity();
 
-            if (bombHit && BattleMainManager.Instance != null)
+            if (eKeyHit && BattleMainManager.Instance != null)
                 BattleMainManager.Instance.ApplyEKeyDebuff(5f);
 
             cachedLogic?.OnEKeyBombFinished();
@@ -251,40 +255,36 @@ public class DropPuzzleBattle : MonoBehaviour
     //   ② EKeyBombを発見 → DestroyCell() で5×5範囲を1マスずつ評価しながら消去
     //   ③ 変化がなくなるまで繰り返す
     // ==================================================
-    bool ExplodeBombs()
+    int ExplodeBombs()
     {
-        bool anyBombHit = false;
-
+        int totalDestroyed = 0;
         bool changed = true;
         while (changed)
         {
             changed = false;
-
             for (int y = 0; y < hight; y++)
             {
                 for (int x = 0; x < wide; x++)
                 {
                     if (field[y, x] != BlockType.EKeyBomb) continue;
 
-                    field[y, x] = BlockType.Empty; // 自身を先に消去（再トリガー防止）
+                    field[y, x] = BlockType.Empty;
+                    totalDestroyed++;
 
                     int xStart = Mathf.Max(0, x - 2);
                     int xEnd = Mathf.Min(wide - 1, x + 2);
                     int yStart = Mathf.Max(0, y - 2);
                     int yEnd = Mathf.Min(hight - 1, y + 2);
 
-                    // 5×5範囲を1マスずつ評価して消去
                     for (int yy = yStart; yy <= yEnd; yy++)
                         for (int xx = xStart; xx <= xEnd; xx++)
-                            DestroyCell(xx, yy);
+                            totalDestroyed += DestroyCell(xx, yy);
 
                     changed = true;
-                    anyBombHit = true;
                 }
             }
         }
-
-        return anyBombHit;
+        return totalDestroyed;
     }
 
     // ==================================================
@@ -296,26 +296,24 @@ public class DropPuzzleBattle : MonoBehaviour
     //   - CrossBomb → 十字範囲を1マスずつ再帰的に DestroyCell() で評価
     //   - 通常ブロック  → そのまま消去
     // ==================================================
-    void DestroyCell(int x, int y)
+    int DestroyCell(int x, int y)
     {
-        if (field[y, x] == BlockType.Empty) return; // 空マスは何もしない
+        if (field[y, x] == BlockType.Empty) return 0;
 
         if (field[y, x] == BlockType.CrossBomb)
         {
-            field[y, x] = BlockType.Empty; // 自身を先に消去（再トリガー防止）
-
-            // 縦列を1マスずつ評価
+            field[y, x] = BlockType.Empty;
+            int count = 1;
             for (int yy = 0; yy < hight; yy++)
-                DestroyCell(x, yy);
-
-            // 横行を1マスずつ評価
+                count += DestroyCell(x, yy);
             for (int xx = 0; xx < wide; xx++)
-                DestroyCell(xx, y);
+                count += DestroyCell(xx, y);
+            return count;
         }
         else
         {
-            // 通常ブロック・EKeyBomb（次ループで起爆）はそのまま消去
             field[y, x] = BlockType.Empty;
+            return 1;
         }
     }
 
@@ -402,13 +400,10 @@ public class DropPuzzleBattle : MonoBehaviour
             // 消去前のy座標を使って十字を1マスずつ評価しながら消去
             foreach (var bomb in crossBombs)
             {
-                // 縦列を1マスずつ評価
                 for (int yy = 0; yy < hight; yy++)
-                    DestroyCell(bomb.x, yy);
-
-                // 横行を1マスずつ評価（消去前の行位置が基準）
+                    totalDestroyed += DestroyCell(bomb.x, yy);
                 for (int xx = 0; xx < wide; xx++)
-                    DestroyCell(xx, bomb.y);
+                    totalDestroyed += DestroyCell(xx, bomb.y);
             }
 
             y--;

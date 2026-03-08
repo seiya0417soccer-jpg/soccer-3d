@@ -3,7 +3,7 @@ using TMPro;
 
 public class GameTimer : MonoBehaviour
 {
-    public static float timeRemaining = 90f; // 残り時間（外部から参照可能）
+    public static float timeRemaining = 60f; // 残り時間（外部から参照可能）
     public static bool isGameOver = false;
 
     [SerializeField] private float totalTime = 90f; // Inspectorから変更可能
