@@ -18,6 +18,8 @@ public class DropPuzzleBattle : MonoBehaviour
     int hight => puzzleFieldSO.Hight;
     int wide => puzzleFieldSO.Wide;
 
+    private GumiData gumiData = new();
+
     // --- フィールド状態保持 ---
     private int[,] field;          // 各マスのブロックタイプ
     private GameObject[,] gridObjects;                     // 実際に表示するブロックオブジェクト
