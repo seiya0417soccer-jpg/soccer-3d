@@ -4,6 +4,8 @@ using UnityEngine;
 /// <summary>
 /// DropPuzzleBattle.cs
 /// - BlockType enumによるブロック種別管理
+/// - 爆弾処理: グリッド単位の繰り返し評価による連鎖方式
+///   → 1グリッドずつ爆弾を評価・消去し、変化がなくなるまでループ
 /// - FindObjectOfType・GetComponentキャッシュ化
 /// </summary>
 public class DropPuzzleBattle : MonoBehaviour
@@ -11,9 +13,6 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     // BlockType enum: フィールド上のブロック種別
     // ==================================================
-    /// <summary>
-    /// フィールド各マスのブロック種別
-    /// </summary>
     public enum BlockType
     {
         Empty = 0,  // 空マス
@@ -25,11 +24,11 @@ public class DropPuzzleBattle : MonoBehaviour
         Piece6 = 6,  // 通常ピース6
         Piece7 = 7,  // 通常ピース7
         Piece8 = 8,  // 通常ピース8
-        VerticalBomb = 9, // 縦爆弾（列全体を消去）
-        EKeyBomb = 10, // Eキー爆弾（5×5範囲爆破）
+        VerticalBomb = 9,  // 縦十字爆弾
+        EKeyBomb = 10, // Eキー爆弾（5×5範囲）
     }
 
-    // --- ブロックPrefab ---
+    // --- Prefab ---
     public GameObject GridPrefub;
 
     [SerializeField] private PuzzleFieldSO puzzleFieldSO;
@@ -40,10 +39,9 @@ public class DropPuzzleBattle : MonoBehaviour
     private GumiData gumiData = new();
 
     // --- フィールド状態保持 ---
-    /// <summary>各マスのブロック種別（BlockType enumで管理）</summary>
     private BlockType[,] field;
     private GameObject[,] gridObjects;
-    private Renderer[,] gridRenderers; // Rendererキャッシュ
+    private Renderer[,] gridRenderers;
 
     private Dictionary<int, Vector2Int[]> pieceData => gumiData.pieceData;
 
@@ -66,21 +64,16 @@ public class DropPuzzleBattle : MonoBehaviour
     private bool skipDestroyedNotification = false;
     private int forcedNextPieceType = -1;
 
-    // --- ピースカラー ---
     private Color[] pieceColors => gumiData.pieceColors;
 
-    // --- Eキー爆弾予約リスト ---
-    private List<Vector2Int> eKeyBombPositions = new List<Vector2Int>();
-
     // --- キャッシュ ---
-    private DropLogicExtension cachedLogic; // FindObjectOfTypeキャッシュ
+    private DropLogicExtension cachedLogic;
 
     // ==================================================
-    // Start: 初期化
+    // Start
     // ==================================================
     void Start()
     {
-        // BlockType enumの配列として初期化（デフォルト値はEmpty=0）
         field = new BlockType[hight, wide];
         gridObjects = new GameObject[hight, wide];
         gridRenderers = new Renderer[hight, wide];
@@ -93,11 +86,10 @@ public class DropPuzzleBattle : MonoBehaviour
                 obj.transform.position = new Vector3(x + offsetX, y + offsetY, 0);
                 obj.SetActive(false);
                 gridObjects[y, x] = obj;
-                gridRenderers[y, x] = obj.GetComponent<Renderer>(); // キャッシュ
+                gridRenderers[y, x] = obj.GetComponent<Renderer>();
             }
         }
 
-        // DropLogicExtensionをキャッシュ
         cachedLogic = FindObjectOfType<DropLogicExtension>();
 
         CreateWall();
@@ -129,7 +121,7 @@ public class DropPuzzleBattle : MonoBehaviour
     }
 
     // ==================================================
-    // 毎フレーム更新
+    // Update
     // ==================================================
     void Update()
     {
@@ -150,7 +142,7 @@ public class DropPuzzleBattle : MonoBehaviour
     }
 
     // ==================================================
-    // 新しいピース生成
+    // ピース生成
     // ==================================================
     void SpawnPiece()
     {
@@ -181,7 +173,7 @@ public class DropPuzzleBattle : MonoBehaviour
     }
 
     // ==================================================
-    // ピース移動
+    // 移動
     // ==================================================
     void Move(Vector2Int dir)
     {
@@ -195,9 +187,9 @@ public class DropPuzzleBattle : MonoBehaviour
         {
             FixPiece();
             int destroyedBlocks = ClearLines();
-            bool eKeyHit = ExplodeEKeyBombWithReservation();
+            bool bombHit = ExplodeBombs();
 
-            if (eKeyHit && BattleMainManager.Instance != null)
+            if (bombHit && BattleMainManager.Instance != null)
                 BattleMainManager.Instance.ApplyEKeyDebuff(5f);
 
             cachedLogic?.OnEKeyBombFinished();
@@ -210,61 +202,79 @@ public class DropPuzzleBattle : MonoBehaviour
     }
 
     // ==================================================
-    // E爆弾処理（5×5 + 縦爆弾チェック）
+    // EKeyBomb処理（グリッド単位の繰り返し評価による連鎖方式）
+    //
+    // 【連鎖フロー】
+    //   ① フィールド全体を1マスずつ走査
+    //   ② EKeyBombを発見 → DestroyCell() で5×5範囲を1マスずつ評価しながら消去
+    //   ③ 変化がなくなるまで繰り返す
     // ==================================================
-    bool ExplodeEKeyBombWithReservation()
+    bool ExplodeBombs()
     {
-        eKeyBombPositions.Clear();
-        HashSet<int> verticalColumnsToExplode = new HashSet<int>();
-        bool eKeyHit = false;
+        bool anyBombHit = false;
 
-        for (int y = 0; y < hight; y++)
+        bool changed = true;
+        while (changed)
         {
-            for (int x = 0; x < wide; x++)
+            changed = false;
+
+            for (int y = 0; y < hight; y++)
             {
-                if (field[y, x] != BlockType.EKeyBomb) continue;
-
-                eKeyHit = true;
-
-                int xStart = Mathf.Max(0, x - 2);
-                int xEnd = Mathf.Min(wide - 1, x + 2);
-                int yStart = Mathf.Max(0, y - 2);
-                int yEnd = Mathf.Min(hight - 1, y + 2);
-
-                for (int yy = yStart; yy <= yEnd; yy++)
+                for (int x = 0; x < wide; x++)
                 {
-                    for (int xx = xStart; xx <= xEnd; xx++)
-                    {
-                        eKeyBombPositions.Add(new Vector2Int(xx, yy));
+                    if (field[y, x] != BlockType.EKeyBomb) continue;
 
-                        // 縦爆弾チェック
-                        if (field[yy, xx] == BlockType.VerticalBomb)
-                        {
-                            bool leftVertical = (xx - 1 >= 0 && field[yy, xx - 1] == BlockType.VerticalBomb);
-                            bool rightVertical = (xx + 1 < wide && field[yy, xx + 1] == BlockType.VerticalBomb);
+                    field[y, x] = BlockType.Empty; // 自身を先に消去（再トリガー防止）
 
-                            verticalColumnsToExplode.Add(xx);
-                            if (leftVertical) verticalColumnsToExplode.Add(xx - 1);
-                            if (rightVertical) verticalColumnsToExplode.Add(xx + 1);
-                        }
-                    }
+                    int xStart = Mathf.Max(0, x - 2);
+                    int xEnd = Mathf.Min(wide - 1, x + 2);
+                    int yStart = Mathf.Max(0, y - 2);
+                    int yEnd = Mathf.Min(hight - 1, y + 2);
+
+                    // 5×5範囲を1マスずつ評価して消去
+                    for (int yy = yStart; yy <= yEnd; yy++)
+                        for (int xx = xStart; xx <= xEnd; xx++)
+                            DestroyCell(xx, yy);
+
+                    changed = true;
+                    anyBombHit = true;
                 }
-
-                field[y, x] = BlockType.Empty; // 爆弾自身を消去
             }
         }
 
-        // 予約リスト消去
-        foreach (var pos in eKeyBombPositions)
-            if (field[pos.y, pos.x] != BlockType.Empty)
-                field[pos.y, pos.x] = BlockType.Empty;
+        return anyBombHit;
+    }
 
-        // 縦列消去
-        foreach (int col in verticalColumnsToExplode)
+    // ==================================================
+    // 1マス評価して消去
+    // 爆弾であれば先に起爆してから消去することで連鎖を実現する
+    //
+    //   - EKeyBomb  → ExplodeBombs() のループが次パスで再起爆するため何もしない
+    //                 （自身消去のみ。既にEmptyでないなら次ループで拾われる）
+    //   - VerticalBomb → 十字範囲を1マスずつ再帰的に DestroyCell() で評価
+    //   - 通常ブロック  → そのまま消去
+    // ==================================================
+    void DestroyCell(int x, int y)
+    {
+        if (field[y, x] == BlockType.Empty) return; // 空マスは何もしない
+
+        if (field[y, x] == BlockType.VerticalBomb)
+        {
+            field[y, x] = BlockType.Empty; // 自身を先に消去（再トリガー防止）
+
+            // 縦列を1マスずつ評価
             for (int yy = 0; yy < hight; yy++)
-                field[yy, col] = BlockType.Empty;
+                DestroyCell(x, yy);
 
-        return eKeyHit;
+            // 横行を1マスずつ評価
+            for (int xx = 0; xx < wide; xx++)
+                DestroyCell(xx, y);
+        }
+        else
+        {
+            // 通常ブロック・EKeyBomb（次ループで起爆）はそのまま消去
+            field[y, x] = BlockType.Empty;
+        }
     }
 
     // ==================================================
@@ -304,7 +314,6 @@ public class DropPuzzleBattle : MonoBehaviour
         {
             Vector2Int p = currentPos + block;
             if (p.y >= 0 && p.y < hight)
-                // currentTypeは0始まりなので+1してBlockTypeにキャスト
                 field[p.y, p.x] = (BlockType)(currentType + 1);
         }
 
@@ -320,16 +329,16 @@ public class DropPuzzleBattle : MonoBehaviour
 
         for (int y = 0; y < hight; y++)
         {
-            // ラインが埋まっているか確認
             bool full = true;
             for (int x = 0; x < wide; x++)
                 if (field[y, x] == BlockType.Empty) { full = false; break; }
             if (!full) continue;
 
-            // 縦爆弾列を記録
-            HashSet<int> bombColumns = new HashSet<int>();
+            // VerticalBombの位置を消去前に記録（列と行の両方）
+            // 行はシフト後にずれるため、消去前のy座標を保持する
+            List<Vector2Int> verticalBombs = new List<Vector2Int>();
             for (int x = 0; x < wide; x++)
-                if (field[y, x] == BlockType.VerticalBomb) bombColumns.Add(x);
+                if (field[y, x] == BlockType.VerticalBomb) verticalBombs.Add(new Vector2Int(x, y));
 
             // ライン消去
             for (int x = 0; x < wide; x++)
@@ -343,10 +352,18 @@ public class DropPuzzleBattle : MonoBehaviour
             for (int x = 0; x < wide; x++)
                 field[hight - 1, x] = BlockType.Empty;
 
-            // 縦爆弾列を全消去
-            foreach (int col in bombColumns)
+            // VerticalBombの受動爆発
+            // 消去前のy座標を使って十字を1マスずつ評価しながら消去
+            foreach (var bomb in verticalBombs)
+            {
+                // 縦列を1マスずつ評価
                 for (int yy = 0; yy < hight; yy++)
-                    field[yy, col] = BlockType.Empty;
+                    DestroyCell(bomb.x, yy);
+
+                // 横行を1マスずつ評価（消去前の行位置が基準）
+                for (int xx = 0; xx < wide; xx++)
+                    DestroyCell(xx, bomb.y);
+            }
 
             y--;
         }
@@ -359,7 +376,6 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     void Draw()
     {
-        // フィールドブロック描画
         for (int y = 0; y < hight; y++)
         {
             for (int x = 0; x < wide; x++)
@@ -371,14 +387,11 @@ public class DropPuzzleBattle : MonoBehaviour
                 else
                 {
                     gridObjects[y, x].SetActive(true);
-                    // BlockType(1〜)→colorIndex(0〜)に変換
-                    int colorIndex = (int)field[y, x] - 1;
-                    gridRenderers[y, x].material.color = pieceColors[colorIndex];
+                    gridRenderers[y, x].material.color = pieceColors[(int)field[y, x] - 1];
                 }
             }
         }
 
-        // 落下中ピース描画
         foreach (var block in currentShape)
         {
             Vector2Int p = currentPos + block;

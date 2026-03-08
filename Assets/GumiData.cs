@@ -7,7 +7,7 @@ public class GumiData
     public int PieceCount => pieceData.Count;                    // ƒs[ƒXí—Ş”
     public GumiData()
     {
-#if true
+#if false
         InitPieces();
 #else
         InitDebugPieces();
