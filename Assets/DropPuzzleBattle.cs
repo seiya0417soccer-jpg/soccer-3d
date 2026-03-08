@@ -24,7 +24,7 @@ public class DropPuzzleBattle : MonoBehaviour
         Piece6 = 6,  // 通常ピース6
         Piece7 = 7,  // 通常ピース7
         Piece8 = 8,  // 通常ピース8
-        VerticalBomb = 9,  // 縦十字爆弾
+        CrossBomb = 9,  // 十字爆弾
         EKeyBomb = 10, // Eキー爆弾（5×5範囲）
     }
 
@@ -60,13 +60,13 @@ public class DropPuzzleBattle : MonoBehaviour
     private float offsetY = 0f;
 
     // --- その他制御 ---
-    private int pieceSpawnCount = 0;
     private bool skipDestroyedNotification = false;
     private int forcedNextPieceType = -1;
 
+    [SerializeField, Range(0f, 1f)] private float crossBombSpawnChance = 0.1f; // 十字爆弾の出現確率
+
     private Color[] pieceColors => gumiData.pieceColors;
 
-    // --- キャッシュ ---
     private DropLogicExtension cachedLogic;
 
     // ==================================================
@@ -146,7 +146,6 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     void SpawnPiece()
     {
-        pieceSpawnCount++;
 
         if (forcedNextPieceType != -1)
         {
@@ -155,8 +154,8 @@ public class DropPuzzleBattle : MonoBehaviour
         }
         else
         {
-            int interval = pieceSpawnCount < 30 ? 10 : 7;
-            int defaultType = (pieceSpawnCount % interval == 0) ? 8 : Random.Range(0, 8);
+            // 十字爆弾の出現確率（0〜1、Inspectorから設定可能）
+            int defaultType = (Random.value < crossBombSpawnChance) ? 8 : Random.Range(0, 8);
             currentType = cachedLogic != null
                 ? cachedLogic.GetNextPieceType(defaultType)
                 : defaultType;
@@ -284,14 +283,14 @@ public class DropPuzzleBattle : MonoBehaviour
     //
     //   - EKeyBomb  → ExplodeBombs() のループが次パスで再起爆するため何もしない
     //                 （自身消去のみ。既にEmptyでないなら次ループで拾われる）
-    //   - VerticalBomb → 十字範囲を1マスずつ再帰的に DestroyCell() で評価
+    //   - CrossBomb → 十字範囲を1マスずつ再帰的に DestroyCell() で評価
     //   - 通常ブロック  → そのまま消去
     // ==================================================
     void DestroyCell(int x, int y)
     {
         if (field[y, x] == BlockType.Empty) return; // 空マスは何もしない
 
-        if (field[y, x] == BlockType.VerticalBomb)
+        if (field[y, x] == BlockType.CrossBomb)
         {
             field[y, x] = BlockType.Empty; // 自身を先に消去（再トリガー防止）
 
@@ -367,11 +366,11 @@ public class DropPuzzleBattle : MonoBehaviour
                 if (field[y, x] == BlockType.Empty) { full = false; break; }
             if (!full) continue;
 
-            // VerticalBombの位置を消去前に記録（列と行の両方）
+            // CrossBombの位置を消去前に記録（列と行の両方）
             // 行はシフト後にずれるため、消去前のy座標を保持する
-            List<Vector2Int> verticalBombs = new List<Vector2Int>();
+            List<Vector2Int> crossBombs = new List<Vector2Int>();
             for (int x = 0; x < wide; x++)
-                if (field[y, x] == BlockType.VerticalBomb) verticalBombs.Add(new Vector2Int(x, y));
+                if (field[y, x] == BlockType.CrossBomb) crossBombs.Add(new Vector2Int(x, y));
 
             // ライン消去
             for (int x = 0; x < wide; x++)
@@ -385,9 +384,9 @@ public class DropPuzzleBattle : MonoBehaviour
             for (int x = 0; x < wide; x++)
                 field[hight - 1, x] = BlockType.Empty;
 
-            // VerticalBombの受動爆発
+            // CrossBombの受動爆発
             // 消去前のy座標を使って十字を1マスずつ評価しながら消去
-            foreach (var bomb in verticalBombs)
+            foreach (var bomb in crossBombs)
             {
                 // 縦列を1マスずつ評価
                 for (int yy = 0; yy < hight; yy++)

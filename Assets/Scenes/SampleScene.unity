@@ -965,7 +965,7 @@ AudioListener:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 962704282}
-  m_Enabled: 1
+  m_Enabled: 0
 --- !u!20 &962704285
 Camera:
   m_ObjectHideFlags: 0
@@ -1075,7 +1075,7 @@ AudioListener:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
-  m_Enabled: 1
+  m_Enabled: 0
 --- !u!20 &963194227
 Camera:
   m_ObjectHideFlags: 0
@@ -1569,6 +1569,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   GridPrefub: {fileID: 1269672825606005516, guid: 4f2b7a1547f77ed4e95f73fe0132d35b, type: 3}
+  puzzleFieldSO: {fileID: 11400000, guid: 22cdb68759614e24e85f15eeb4626c13, type: 2}
 --- !u!4 &1257438899
 Transform:
   m_ObjectHideFlags: 0
@@ -1596,7 +1597,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bc06654420c2a93449f91199311b01a3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dropPuzzle: {fileID: 1257438898}
+  dropPuzzle: {fileID: 0}
   eKeyBombType: 9
   eKey: 101
 --- !u!1 &1415713231
@@ -1986,7 +1987,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1892640827
 RectTransform:
   m_ObjectHideFlags: 0
