@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 /// <summary>
@@ -12,12 +13,13 @@ public class DropPuzzleBattle : MonoBehaviour
     // --- ブロックPrefab ---
     public GameObject GridPrefub; // 1マスブロックのPrefab
 
-    // --- フィールドサイズ ---
-    private const int Width = 13;  // 横幅
-    private const int Height = 22; // 高さ
+    [SerializeField] private PuzzleFieldSO puzzleFieldSO;
+
+    int hight => puzzleFieldSO.Hight;
+    int wide => puzzleFieldSO.Wide;
 
     // --- フィールド状態保持 ---
-    private int[,] field = new int[Height, Width];          // 各マスのブロックタイプ
+    private int[,] field;          // 各マスのブロックタイプ
     private GameObject[,] gridObjects;                     // 実際に表示するブロックオブジェクト
 
     // --- ピース管理 ---
@@ -59,10 +61,11 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     void Start()
     {
-        // グリッドオブジェクト生成
-        gridObjects = new GameObject[Height, Width];
-        for (int y = 0; y < Height; y++)
-            for (int x = 0; x < Width; x++)
+        field = new int[hight,wide]; //初期化処理
+
+        gridObjects = new GameObject[hight, wide];
+        for (int y = 0; y < hight; y++)
+            for (int x = 0; x < wide; x++)
             {
                 GameObject obj = Instantiate(GridPrefub);
                 obj.transform.position = new Vector3(x + offsetX, y + offsetY, 0);
@@ -80,16 +83,16 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     void CreateWall()
     {
-        for (int y = -1; y <= Height; y++)
+        for (int y = -1; y <= hight; y++)
         {
             CreateWallBlock(-1, y);           // 左壁
-            CreateWallBlock(Width, y);        // 右壁
+            CreateWallBlock(wide, y);        // 右壁
         }
 
-        for (int x = -1; x <= Width; x++)
+        for (int x = -1; x <= wide; x++)
         {
             CreateWallBlock(x, -1);           // 下壁
-            CreateWallBlock(x, Height);       // 上壁
+            CreateWallBlock(x, hight);       // 上壁
         }
     }
 
@@ -163,7 +166,7 @@ public class DropPuzzleBattle : MonoBehaviour
         }
 
         currentShape = pieceData[currentType];
-        currentPos = new Vector2Int(Width / 2, Height - 2);
+        currentPos = new Vector2Int(wide / 2, hight - 2);
 
         if (!IsValidPosition(currentPos, currentShape))
         {
@@ -213,9 +216,9 @@ public class DropPuzzleBattle : MonoBehaviour
         bool eKeyHit = false;
 
         // フィールド全体を探索
-        for (int y = 0; y < Height; y++)
+        for (int y = 0; y < hight; y++)
         {
-            for (int x = 0; x < Width; x++)
+            for (int x = 0; x < wide; x++)
             {
                 if (field[y, x] == 10) // E爆弾
                 {
@@ -223,9 +226,9 @@ public class DropPuzzleBattle : MonoBehaviour
 
                     // 5x5爆破範囲
                     int xStart = Mathf.Max(0, x - 2);
-                    int xEnd = Mathf.Min(Width - 1, x + 2);
+                    int xEnd = Mathf.Min(wide - 1, x + 2);
                     int yStart = Mathf.Max(0, y - 2);
-                    int yEnd = Mathf.Min(Height - 1, y + 2);
+                    int yEnd = Mathf.Min(hight - 1, y + 2);
 
                     // まず範囲内を予約
                     for (int yy = yStart; yy <= yEnd; yy++)
@@ -238,7 +241,7 @@ public class DropPuzzleBattle : MonoBehaviour
                             {
                                 // 左右隣チェック（範囲外も含む）
                                 bool leftBlack = (xx - 1 >= 0 && field[yy, xx - 1] == 9);
-                                bool rightBlack = (xx + 1 < Width && field[yy, xx + 1] == 9);
+                                bool rightBlack = (xx + 1 < wide && field[yy, xx + 1] == 9);
 
                                 if (leftBlack) verticalColumnsToExplode.Add(xx - 1); // 左隣列も縦消去
                                 if (rightBlack) verticalColumnsToExplode.Add(xx + 1); // 右隣列も縦消去
@@ -258,7 +261,7 @@ public class DropPuzzleBattle : MonoBehaviour
 
         // 縦列消去
         foreach (int col in verticalColumnsToExplode)
-            for (int yy = 0; yy < Height; yy++)
+            for (int yy = 0; yy < hight; yy++)
                 if (field[yy, col] != 0)
                     field[yy, col] = 0;
 
@@ -286,9 +289,9 @@ public class DropPuzzleBattle : MonoBehaviour
         foreach (var block in shape)
         {
             Vector2Int p = pos + block;
-            if (p.x < 0 || p.x >= Width) return false;
+            if (p.x < 0 || p.x >= wide) return false;
             if (p.y < 0) return false;
-            if (p.y < Height && field[p.y, p.x] != 0) return false;
+            if (p.y < hight && field[p.y, p.x] != 0) return false;
         }
         return true;
     }
@@ -301,7 +304,7 @@ public class DropPuzzleBattle : MonoBehaviour
         foreach (var block in currentShape)
         {
             Vector2Int p = currentPos + block;
-            if (p.y >= 0 && p.y < Height)
+            if (p.y >= 0 && p.y < hight)
                 field[p.y, p.x] = currentType + 1;
         }
 
@@ -315,29 +318,29 @@ public class DropPuzzleBattle : MonoBehaviour
     {
         int totalDestroyed = 0;
 
-        for (int y = 0; y < Height; y++)
+        for (int y = 0; y < hight; y++)
         {
             bool full = true;
-            for (int x = 0; x < Width; x++)
+            for (int x = 0; x < wide; x++)
                 if (field[y, x] == 0) { full = false; break; }
             if (!full) continue;
 
             HashSet<int> bombColumns = new HashSet<int>();
-            for (int x = 0; x < Width; x++)
+            for (int x = 0; x < wide; x++)
                 if (field[y, x] == 9) bombColumns.Add(x);
 
-            for (int x = 0; x < Width; x++)
+            for (int x = 0; x < wide; x++)
                 if (field[y, x] != 0) { field[y, x] = 0; totalDestroyed++; }
 
-            for (int yy = y; yy < Height - 1; yy++)
-                for (int x = 0; x < Width; x++)
+            for (int yy = y; yy < hight - 1; yy++)
+                for (int x = 0; x < wide; x++)
                     field[yy, x] = field[yy + 1, x];
 
-            for (int x = 0; x < Width; x++)
-                field[Height - 1, x] = 0;
+            for (int x = 0; x < wide; x++)
+                field[hight - 1, x] = 0;
 
             foreach (int col in bombColumns)
-                for (int yy = 0; yy < Height; yy++)
+                for (int yy = 0; yy < hight; yy++)
                     if (field[yy, col] != 0) field[yy, col] = 0;
 
             y--;
@@ -351,12 +354,12 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     void Draw()
     {
-        for (int y = 0; y < Height; y++)
-            for (int x = 0; x < Width; x++)
+        for (int y = 0; y < hight; y++)
+            for (int x = 0; x < wide; x++)
                 gridObjects[y, x].SetActive(false);
 
-        for (int y = 0; y < Height; y++)
-            for (int x = 0; x < Width; x++)
+        for (int y = 0; y < hight; y++)
+            for (int x = 0; x < wide; x++)
                 if (field[y, x] != 0)
                 {
                     gridObjects[y, x].SetActive(true);
@@ -366,7 +369,7 @@ public class DropPuzzleBattle : MonoBehaviour
         foreach (var block in currentShape)
         {
             Vector2Int p = currentPos + block;
-            if (p.y >= 0 && p.y < Height)
+            if (p.y >= 0 && p.y < hight)
             {
                 gridObjects[p.y, p.x].SetActive(true);
                 gridObjects[p.y, p.x].GetComponent<Renderer>().material.color = pieceColors[currentType];
