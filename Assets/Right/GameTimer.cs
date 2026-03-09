@@ -3,43 +3,50 @@ using TMPro;
 
 public class GameTimer : MonoBehaviour
 {
-    public static float timeRemaining = 60f; // 残り時間（外部から参照可能）
+    public static float timeRemaining = 60f;
     public static bool isGameOver = false;
 
-    [SerializeField] private float totalTime = 90f; // Inspectorから変更可能
-    public GameObject timerObject; // タイマー表示用テキストオブジェクト
+    [SerializeField] private float totalTime = 90f;
+    public GameObject timerObject;
+
+    private bool isRunning = false; // StartTimer()が呼ばれるまで動かない
 
     void Start()
     {
         timeRemaining = totalTime;
         isGameOver = false;
+        isRunning = false;
+    }
+
+    // GameFlowManagerから呼ばれる
+    public void StartTimer()
+    {
+        isRunning = true;
     }
 
     void Update()
     {
+        if (!isRunning) return;
         if (isGameOver) return;
 
-        // 残り時間を減らす
         timeRemaining -= Time.deltaTime;
 
         if (timeRemaining <= 0f)
         {
             timeRemaining = 0f;
             isGameOver = true;
+            isRunning = false;
             OnTimeUp();
         }
 
         // テキスト更新
         string display = FormatTime(timeRemaining);
-
         var tmp = timerObject.GetComponent<TextMeshProUGUI>();
         var legacy = timerObject.GetComponent<UnityEngine.UI.Text>();
-
         if (tmp != null) tmp.text = display;
         if (legacy != null) legacy.text = display;
     }
 
-    // 秒を "1:30" 形式にフォーマット
     string FormatTime(float seconds)
     {
         int m = Mathf.FloorToInt(seconds / 60f);
@@ -49,8 +56,8 @@ public class GameTimer : MonoBehaviour
 
     void OnTimeUp()
     {
-        // 時間切れ処理（ゲーム停止）
-        Time.timeScale = 0f;
-        Debug.Log("Time Up! Score: " + ScoreManager.score);
+        Debug.Log("Time Up!");
+        // GameFlowManagerにフィニッシュを通知
+        GameFlowManager.Instance?.OnFinish();
     }
 }
