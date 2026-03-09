@@ -193,6 +193,7 @@ public class DropPuzzleBattle : MonoBehaviour
     void Move(Vector2Int dir)
     {
         if (isProcessingIslands) return;
+        if (Time.timeScale == 0f) return;
 
         Vector2Int newPos = currentPos + dir;
 
@@ -337,6 +338,7 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     void Rotate()
     {
+        if (Time.timeScale == 0f) return;
         Vector2Int[] rotated = new Vector2Int[currentShape.Length];
         for (int i = 0; i < currentShape.Length; i++)
             rotated[i] = new Vector2Int(-currentShape[i].y, currentShape[i].x);
