@@ -181,6 +181,7 @@ public class DropPuzzleBattle : MonoBehaviour
         {
             Debug.Log("Game Over");
             enabled = false;
+            GameFlowManager.Instance?.OnGameOver();
         }
     }
 
