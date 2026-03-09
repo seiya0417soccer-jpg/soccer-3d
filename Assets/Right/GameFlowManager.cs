@@ -16,12 +16,16 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private GameObject titlePanel;
     [SerializeField] private GameObject manualPanel;
     [SerializeField] private GameObject readyGoGroup;
+    [SerializeField] private GameObject gameOverPanel;
+    [SerializeField] private GameObject finishPanel;
 
     [Header("ReadyGo")]
-    [SerializeField] private TextMeshProUGUI countdownText; // ReadyGoGroup内のテキスト
+    [SerializeField] private TextMeshProUGUI countdownText;
 
     [Header("References")]
     [SerializeField] private GameTimer gameTimer;
+    [SerializeField] private GameObject killCountObject;
+    [SerializeField] private GameObject timerTextObject;
 
     void Awake()
     {
@@ -30,11 +34,12 @@ public class GameFlowManager : MonoBehaviour
 
     void Start()
     {
-        // ゲーム開始時は全て止めてタイトルを表示
         Time.timeScale = 0f;
         titlePanel.SetActive(true);
         manualPanel.SetActive(false);
         readyGoGroup.SetActive(false);
+        gameOverPanel.SetActive(false);
+        finishPanel.SetActive(false);
     }
 
     // ==================================================
@@ -61,7 +66,7 @@ public class GameFlowManager : MonoBehaviour
     }
 
     // ==================================================
-    // 操作説明画面：次へボタンから呼ぶ
+    // 操作説明画面：エンターキーで進む
     // ==================================================
     public void OnManualNext()
     {
@@ -75,40 +80,83 @@ public class GameFlowManager : MonoBehaviour
     // ==================================================
     IEnumerator CountdownCoroutine()
     {
-        // カウントダウン中はUnscaledTimeを使う（timeScale=0でも動く）
         countdownText.text = "3";
         yield return new WaitForSecondsRealtime(1f);
-
         countdownText.text = "2";
         yield return new WaitForSecondsRealtime(1f);
-
         countdownText.text = "1";
         yield return new WaitForSecondsRealtime(1f);
-
         countdownText.text = "GO!";
         yield return new WaitForSecondsRealtime(0.8f);
 
-        // ゲーム開始
         readyGoGroup.SetActive(false);
         Time.timeScale = 1f;
 
-        // タイマー開始
         if (gameTimer != null)
             gameTimer.StartTimer();
     }
+
     // ==================================================
     // フィニッシュ（時間切れ）
+    // エンターキーのみでリザルトへ
     // ==================================================
     public void OnFinish()
     {
         Time.timeScale = 0f;
-        Debug.Log("Finish!");
-        // TODO: フィニッシュ画面を表示
+        killCountObject?.SetActive(false);
+        timerTextObject?.SetActive(false);
+        finishPanel.SetActive(true);
+        StartCoroutine(WaitForFinishInput());
     }
+
+    IEnumerator WaitForFinishInput()
+    {
+        while (true)
+        {
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                GoToResult();
+                yield break;
+            }
+            yield return null;
+        }
+    }
+
+    // ==================================================
+    // ゲームオーバー
+    // 3秒経過 または エンターキーでリザルトへ
+    // ==================================================
     public void OnGameOver()
     {
         Time.timeScale = 0f;
-        Debug.Log("Game Over!");
-        // TODO: ゲームオーバー画面を表示
+        killCountObject?.SetActive(false);
+        timerTextObject?.SetActive(false);
+        gameOverPanel.SetActive(true);
+        StartCoroutine(WaitForGameOverTransition());
+    }
+
+    IEnumerator WaitForGameOverTransition()
+    {
+        float elapsed = 0f;
+        while (elapsed < 3f)
+        {
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                GoToResult();
+                yield break;
+            }
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+        GoToResult();
+    }
+
+    // ==================================================
+    // リザルトへ遷移
+    // ==================================================
+    void GoToResult()
+    {
+        Debug.Log("Go to Result!");
+        // TODO: リザルト画面を表示
     }
 }
