@@ -156,7 +156,37 @@ public class GameFlowManager : MonoBehaviour
     // ==================================================
     void GoToResult()
     {
-        Debug.Log("Go to Result!");
-        // TODO: リザルト画面を表示
+        gameOverPanel.SetActive(false);
+        finishPanel.SetActive(false);
+        ResultManager.Instance.ShowResult();
+    }
+
+    // ==================================================
+    // もう一度（カウントダウンから）
+    // ==================================================
+    public void RestartFromCountdown()
+    {
+        // 全パネルを閉じてカウントダウンから再スタート
+        titlePanel.SetActive(false);
+        manualPanel.SetActive(false);
+        gameOverPanel.SetActive(false);
+        finishPanel.SetActive(false);
+        killCountObject?.SetActive(true);
+        timerTextObject?.SetActive(true);
+        readyGoGroup.SetActive(true);
+        StartCoroutine(CountdownCoroutine());
+    }
+
+    // ==================================================
+    // タイトルへ戻る
+    // ==================================================
+    public void GoToTitle()
+    {
+        gameOverPanel.SetActive(false);
+        finishPanel.SetActive(false);
+        killCountObject?.SetActive(true);
+        timerTextObject?.SetActive(true);
+        Time.timeScale = 0f;
+        titlePanel.SetActive(true);
     }
 }
