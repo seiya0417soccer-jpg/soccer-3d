@@ -2,28 +2,45 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 
+/// <summary>
+/// YushaBrain.cs
+/// 勇者のAI制御
+/// 
+/// - 最も近い敵を追いかけて攻撃
+/// - 敵がいない場合は中央待機
+/// - バフ・デバフによる速度変更
+/// - もう一度プレイ時にResetPosition()で初期位置に戻す
+/// </summary>
 public class YushaBrain : MonoBehaviour
 {
     private NavMeshAgent agent;
-    public float defaultSpeed = 2f;
+    public float defaultSpeed = 2f; // 基本移動速度
 
     private Coroutine debuffCoroutine;
 
+    // ==================================================
+    // Start: 初期化
+    // NavMeshAgentを取得して初期位置に配置
+    // ==================================================
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
         agent.speed = defaultSpeed;
-        agent.Warp(new Vector3(0, 1, 0));
+        agent.Warp(new Vector3(0, 1, 0)); // 初期位置は中央
     }
 
+    // ==================================================
+    // Update: 毎フレーム処理
+    // 最も近い敵を追いかけて1.5f以内で攻撃・消去
+    // ==================================================
     void Update()
     {
         GameObject nearest = GetNearestEnemy();
-
         if (nearest != null)
         {
             agent.SetDestination(nearest.transform.position);
 
+            // 敵に近づいたら攻撃（消去）してスコア加算
             if (Vector3.Distance(transform.position, nearest.transform.position) < 1.5f)
             {
                 Destroy(nearest);
@@ -39,13 +56,11 @@ public class YushaBrain : MonoBehaviour
 
     // ==================================================
     // 最も近い敵を返す
-    // FindObjectsByTagで全敵を取得し、距離で比較
+    // FindGameObjectsWithTagで全敵を取得し、距離で比較
     // ==================================================
     GameObject GetNearestEnemy()
     {
-        // Unity6以降はFindObjectsByTag、旧バージョンはFindGameObjectsWithTag
         GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
-
         GameObject nearest = null;
         float minDist = float.MaxValue;
 
@@ -58,12 +73,12 @@ public class YushaBrain : MonoBehaviour
                 nearest = enemy;
             }
         }
-
         return nearest;
     }
 
     // ==================================================
     // 速度バフ更新
+    // BattleMainManagerから呼ばれる
     // ==================================================
     public void UpdateSpeed(float bonusSpeed)
     {
@@ -71,7 +86,8 @@ public class YushaBrain : MonoBehaviour
     }
 
     // ==================================================
-    // Eキー爆弾デバフ（BattleMainManagerから呼ばれる想定だが念のため残す）
+    // Eキー爆弾デバフ
+    // duration秒間速度を0にする
     // ==================================================
     public void ApplyEKeyDebuff(float duration)
     {
@@ -87,5 +103,23 @@ public class YushaBrain : MonoBehaviour
         yield return new WaitForSeconds(duration);
         agent.speed = originalSpeed;
         debuffCoroutine = null;
+    }
+
+    // ==================================================
+    // リセット
+    // もう一度プレイ時にGameFlowManagerから呼ばれる
+    // 初期位置に戻して速度をリセット
+    // ==================================================
+    public void ResetPosition()
+    {
+        agent.Warp(new Vector3(0, 1, 0)); // 初期位置に瞬間移動
+        agent.speed = defaultSpeed;       // 速度をリセット
+
+        // デバフ中なら止める
+        if (debuffCoroutine != null)
+        {
+            StopCoroutine(debuffCoroutine);
+            debuffCoroutine = null;
+        }
     }
 }
