@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -15,16 +16,16 @@ public class DropPuzzleBattle : MonoBehaviour
     // ==================================================
     public enum BlockType
     {
-        Empty = 0,  // 空マス
-        Piece1 = 1,  // 通常ピース1
-        Piece2 = 2,  // 通常ピース2
-        Piece3 = 3,  // 通常ピース3
-        Piece4 = 4,  // 通常ピース4
-        Piece5 = 5,  // 通常ピース5
-        Piece6 = 6,  // 通常ピース6
-        Piece7 = 7,  // 通常ピース7
-        Piece8 = 8,  // 通常ピース8
-        Piece9 = 9,  // 通常ピース9（白・旧CrossBomb形状）
+        Empty = 0,
+        Piece1 = 1,
+        Piece2 = 2,
+        Piece3 = 3,
+        Piece4 = 4,
+        Piece5 = 5,
+        Piece6 = 6,
+        Piece7 = 7,
+        Piece8 = 8,
+        Piece9 = 9,  // 白・旧CrossBomb形状
         CrossBomb = 10, // 十字爆弾（1マス・黒）
         EKeyBomb = 11, // Eキー爆弾（5×5範囲）
     }
@@ -64,7 +65,7 @@ public class DropPuzzleBattle : MonoBehaviour
     private bool skipDestroyedNotification = false;
     private int forcedNextPieceType = -1;
 
-    [SerializeField, Range(0f, 1f)] private float crossBombChance = 0.1f; // 各マスがCrossBombになる確率
+    [SerializeField, Range(0f, 1f)] private float crossBombChance = 0.1f;
 
     private Color[] pieceColors => gumiData.pieceColors;
 
@@ -142,7 +143,7 @@ public class DropPuzzleBattle : MonoBehaviour
         Draw();
     }
 
-    private HashSet<int> crossBombBlockIndices = new HashSet<int>(); // 落下中にCrossBombになってるマスのインデックス
+    private HashSet<int> crossBombBlockIndices = new HashSet<int>();
 
     // ==================================================
     // ピース生成
@@ -158,7 +159,6 @@ public class DropPuzzleBattle : MonoBehaviour
         }
         else
         {
-            // 通常ピースからランダムに選択（Piece9=白を含む0〜8）
             int defaultType = Random.Range(0, 9);
             currentType = cachedLogic != null
                 ? cachedLogic.GetNextPieceType(defaultType)
@@ -167,10 +167,13 @@ public class DropPuzzleBattle : MonoBehaviour
 
         currentShape = pieceData[currentType];
 
-        // 各マスを確率でCrossBombとしてマーク
-        for (int i = 0; i < currentShape.Length; i++)
-            if (Random.value < crossBombChance)
-                crossBombBlockIndices.Add(i);
+        // EKeyBombはCrossBombマークをスキップ
+        if (currentType != (int)BlockType.EKeyBomb)
+        {
+            for (int i = 0; i < currentShape.Length; i++)
+                if (Random.value < crossBombChance)
+                    crossBombBlockIndices.Add(i);
+        }
 
         currentPos = new Vector2Int(wide / 2, hight - 2);
 
@@ -181,11 +184,15 @@ public class DropPuzzleBattle : MonoBehaviour
         }
     }
 
+    private bool isProcessingIslands = false;
+
     // ==================================================
     // 移動
     // ==================================================
     void Move(Vector2Int dir)
     {
+        if (isProcessingIslands) return;
+
         Vector2Int newPos = currentPos + dir;
 
         if (IsValidPosition(newPos, currentShape))
@@ -197,11 +204,8 @@ public class DropPuzzleBattle : MonoBehaviour
             FixPiece();
             int destroyedBlocks = ClearLines();
             int bombDestroyed = ExplodeBombs();
-            Debug.Log("destroyedBlocks: " + destroyedBlocks);
-            Debug.Log("bombDestroyed: " + bombDestroyed);
             bool eKeyHit = bombDestroyed > 0;
             destroyedBlocks += bombDestroyed;
-            ApplyGravity();
 
             if (eKeyHit && BattleMainManager.Instance != null)
                 BattleMainManager.Instance.ApplyEKeyDebuff(5f);
@@ -211,16 +215,39 @@ public class DropPuzzleBattle : MonoBehaviour
             if (!skipDestroyedNotification && destroyedBlocks > 0 && BattleMainManager.Instance != null)
                 BattleMainManager.Instance.OnBlocksDestroyed(destroyedBlocks);
 
-            SpawnPiece();
+            StartCoroutine(ProcessIslandsThenSpawn());
         }
     }
 
     // ==================================================
+    // 浮き島処理 → ライン消去連鎖 → SpawnPiece
+    // ==================================================
+    IEnumerator ProcessIslandsThenSpawn()
+    {
+        isProcessingIslands = true;
+
+        while (true)
+        {
+            List<List<Vector2Int>> islands = GetFloatingIslands();
+            if (islands.Count == 0) break;
+
+            yield return StartCoroutine(DropFloatingIslands(islands));
+
+            yield return new WaitForSeconds(0.3f);
+
+            int destroyed = ClearLines();
+            if (destroyed > 0 && !skipDestroyedNotification && BattleMainManager.Instance != null)
+                BattleMainManager.Instance.OnBlocksDestroyed(destroyed);
+
+            if (destroyed == 0) break;
+        }
+
+        isProcessingIslands = false;
+        SpawnPiece();
+    }
+
+    // ==================================================
     // 行シフト処理
-    //
-    // 空行（y行のx=0〜wide-1が全てEmpty）を見つけたら、
-    // その行より上の全ブロックを1行分下にずらす。
-    // これをhight回繰り返すことで複数の空行も解消される。
     // ==================================================
     void ApplyGravity()
     {
@@ -228,19 +255,16 @@ public class DropPuzzleBattle : MonoBehaviour
         {
             for (int y = 0; y < hight - 1; y++)
             {
-                // y行が空行か確認
                 bool isEmpty = true;
                 for (int x = 0; x < wide; x++)
                     if (field[y, x] != BlockType.Empty) { isEmpty = false; break; }
 
                 if (!isEmpty) continue;
 
-                // 空行より上を1行分下にずらす
                 for (int yy = y; yy < hight - 1; yy++)
                     for (int x = 0; x < wide; x++)
                         field[yy, x] = field[yy + 1, x];
 
-                // 一番上の行を空にする
                 for (int x = 0; x < wide; x++)
                     field[hight - 1, x] = BlockType.Empty;
             }
@@ -248,17 +272,13 @@ public class DropPuzzleBattle : MonoBehaviour
     }
 
     // ==================================================
-    // EKeyBomb処理（グリッド単位の繰り返し評価による連鎖方式）
-    //
-    // 【連鎖フロー】
-    //   ① フィールド全体を1マスずつ走査
-    //   ② EKeyBombを発見 → DestroyCell() で5×5範囲を1マスずつ評価しながら消去
-    //   ③ 変化がなくなるまで繰り返す
+    // EKeyBomb処理
     // ==================================================
     int ExplodeBombs()
     {
         int totalDestroyed = 0;
         bool changed = true;
+
         while (changed)
         {
             changed = false;
@@ -289,12 +309,6 @@ public class DropPuzzleBattle : MonoBehaviour
 
     // ==================================================
     // 1マス評価して消去
-    // 爆弾であれば先に起爆してから消去することで連鎖を実現する
-    //
-    //   - EKeyBomb  → ExplodeBombs() のループが次パスで再起爆するため何もしない
-    //                 （自身消去のみ。既にEmptyでないなら次ループで拾われる）
-    //   - CrossBomb → 十字範囲を1マスずつ再帰的に DestroyCell() で評価
-    //   - 通常ブロック  → そのまま消去
     // ==================================================
     int DestroyCell(int x, int y)
     {
@@ -355,12 +369,16 @@ public class DropPuzzleBattle : MonoBehaviour
             Vector2Int p = currentPos + currentShape[i];
             if (p.y < 0 || p.y >= hight) continue;
 
-            // CrossBombとしてマークされていればCrossBomb(10)、それ以外は通常ブロック
-            field[p.y, p.x] = crossBombBlockIndices.Contains(i)
-                ? BlockType.CrossBomb
-                : (BlockType)(currentType + 1);
-        }
+            BlockType blockType;
+            if (currentType == (int)BlockType.EKeyBomb)
+                blockType = BlockType.EKeyBomb;
+            else if (crossBombBlockIndices.Contains(i))
+                blockType = BlockType.CrossBomb;
+            else
+                blockType = (BlockType)(currentType + 1);
 
+            field[p.y, p.x] = blockType;
+        }
         OnPieceFixed?.Invoke();
     }
 
@@ -378,17 +396,13 @@ public class DropPuzzleBattle : MonoBehaviour
                 if (field[y, x] == BlockType.Empty) { full = false; break; }
             if (!full) continue;
 
-            // CrossBombの位置を消去前に記録（列と行の両方）
-            // 行はシフト後にずれるため、消去前のy座標を保持する
             List<Vector2Int> crossBombs = new List<Vector2Int>();
             for (int x = 0; x < wide; x++)
                 if (field[y, x] == BlockType.CrossBomb) crossBombs.Add(new Vector2Int(x, y));
 
-            // ライン消去
             for (int x = 0; x < wide; x++)
                 if (field[y, x] != BlockType.Empty) { field[y, x] = BlockType.Empty; totalDestroyed++; }
 
-            // 上のラインを1段下にシフト
             for (int yy = y; yy < hight - 1; yy++)
                 for (int x = 0; x < wide; x++)
                     field[yy, x] = field[yy + 1, x];
@@ -396,8 +410,6 @@ public class DropPuzzleBattle : MonoBehaviour
             for (int x = 0; x < wide; x++)
                 field[hight - 1, x] = BlockType.Empty;
 
-            // CrossBombの受動爆発
-            // 消去前のy座標を使って十字を1マスずつ評価しながら消去
             foreach (var bomb in crossBombs)
             {
                 for (int yy = 0; yy < hight; yy++)
@@ -429,16 +441,18 @@ public class DropPuzzleBattle : MonoBehaviour
                 {
                     gridObjects[y, x].SetActive(true);
                     if (field[y, x] == BlockType.CrossBomb)
-                        gridRenderers[y, x].material.color = Color.black;       // 十字爆弾は黒
+                        gridRenderers[y, x].material.color = Color.black;
+                    else if (field[y, x] == BlockType.EKeyBomb)
+                        gridRenderers[y, x].material.color = Color.red;
                     else if (field[y, x] == BlockType.Piece9)
-                        gridRenderers[y, x].material.color = Color.white;       // Piece9は白
+                        gridRenderers[y, x].material.color = Color.white;
                     else
                         gridRenderers[y, x].material.color = pieceColors[(int)field[y, x] - 1];
                 }
             }
         }
 
-        // 落下中ピース描画（CrossBombマスは黒で表示）
+        // 落下中ピース描画
         for (int i = 0; i < currentShape.Length; i++)
         {
             Vector2Int p = currentPos + currentShape[i];
@@ -448,11 +462,13 @@ public class DropPuzzleBattle : MonoBehaviour
 
                 Color blockColor;
                 if (crossBombBlockIndices.Contains(i))
-                    blockColor = Color.black;                        // CrossBombマスは黒（Piece9含む）
+                    blockColor = Color.black;
+                else if (currentType == (int)BlockType.EKeyBomb)
+                    blockColor = Color.red;
                 else if (currentType == (int)BlockType.Piece9 - 1)
-                    blockColor = Color.white;                        // Piece9の通常マスは白
+                    blockColor = Color.white;
                 else
-                    blockColor = pieceColors[currentType];           // 通常ピースはピースカラー
+                    blockColor = pieceColors[currentType];
 
                 gridRenderers[p.y, p.x].material.color = blockColor;
             }
@@ -473,5 +489,172 @@ public class DropPuzzleBattle : MonoBehaviour
     public void ForceNextPieceType(int type)
     {
         forcedNextPieceType = type;
+    }
+
+    // ==================================================
+    // 浮き島検出
+    // Flood Fillでy=0（床）に繋がっていないブロック群を浮き島と判定
+    // ==================================================
+    List<List<Vector2Int>> GetFloatingIslands()
+    {
+        bool[,] grounded = new bool[hight, wide];
+        Queue<Vector2Int> queue = new Queue<Vector2Int>();
+
+        for (int x = 0; x < wide; x++)
+        {
+            if (field[0, x] != BlockType.Empty)
+            {
+                grounded[0, x] = true;
+                queue.Enqueue(new Vector2Int(x, 0));
+            }
+        }
+
+        Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+        while (queue.Count > 0)
+        {
+            Vector2Int cell = queue.Dequeue();
+            foreach (var d in dirs)
+            {
+                Vector2Int next = cell + d;
+                if (next.x < 0 || next.x >= wide || next.y < 0 || next.y >= hight) continue;
+                if (grounded[next.y, next.x]) continue;
+                if (field[next.y, next.x] == BlockType.Empty) continue;
+
+                grounded[next.y, next.x] = true;
+                queue.Enqueue(next);
+            }
+        }
+
+        bool[,] visited = new bool[hight, wide];
+        List<List<Vector2Int>> islands = new List<List<Vector2Int>>();
+
+        for (int y = 1; y < hight; y++)
+        {
+            for (int x = 0; x < wide; x++)
+            {
+                if (field[y, x] == BlockType.Empty) continue;
+                if (grounded[y, x]) continue;
+                if (visited[y, x]) continue;
+
+                List<Vector2Int> island = new List<Vector2Int>();
+                Queue<Vector2Int> islandQueue = new Queue<Vector2Int>();
+                islandQueue.Enqueue(new Vector2Int(x, y));
+                visited[y, x] = true;
+
+                while (islandQueue.Count > 0)
+                {
+                    Vector2Int cell = islandQueue.Dequeue();
+                    island.Add(cell);
+
+                    foreach (var d in dirs)
+                    {
+                        Vector2Int next = cell + d;
+                        if (next.x < 0 || next.x >= wide || next.y < 0 || next.y >= hight) continue;
+                        if (visited[next.y, next.x]) continue;
+                        if (field[next.y, next.x] == BlockType.Empty) continue;
+                        if (grounded[next.y, next.x]) continue;
+
+                        visited[next.y, next.x] = true;
+                        islandQueue.Enqueue(next);
+                    }
+                }
+
+                islands.Add(island);
+            }
+        }
+
+        return islands;
+    }
+
+    // ==================================================
+    // 浮き島落下アニメーション
+    //
+    // x列ごとにy昇順（下から）で着地座標を確定し、
+    // 1秒かけてコマ送りで落下させる
+    // ==================================================
+    IEnumerator DropFloatingIslands(List<List<Vector2Int>> islands)
+    {
+        if (islands.Count == 0) yield break;
+
+        // 全浮き島ブロックをSetにまとめる
+        var islandSet = new HashSet<Vector2Int>();
+        foreach (var island in islands)
+            foreach (var b in island)
+                islandSet.Add(b);
+
+        // x列ごとにy昇順（下から上）で着地座標を確定
+        // 下のブロックが着地した座標を次のブロックの障害物として扱う
+        var finalPositions = new Dictionary<Vector2Int, Vector2Int>();
+
+        for (int x = 0; x < wide; x++)
+        {
+            // この列の浮き島ブロックをy昇順で収集
+            var colYs = new List<int>();
+            foreach (var b in islandSet)
+                if (b.x == x) colYs.Add(b.y);
+            if (colYs.Count == 0) continue;
+            colYs.Sort(); // y昇順（下から）
+
+            // 最下段ブロックの直下にある障害物を探す（浮き島以外）
+            int lowestY = colYs[0];
+            int obstacleY = -1;
+            for (int yy = lowestY - 1; yy >= 0; yy--)
+            {
+                if (field[yy, x] == BlockType.Empty) continue;
+                if (islandSet.Contains(new Vector2Int(x, yy))) continue;
+                obstacleY = yy;
+                break;
+            }
+
+            // 下から順に着地座標を確定
+            int nextLandY = obstacleY + 1;
+            for (int i = 0; i < colYs.Count; i++)
+            {
+                finalPositions[new Vector2Int(x, colYs[i])] = new Vector2Int(x, nextLandY);
+                nextLandY++;
+            }
+        }
+
+        // 最大落下距離
+        int maxDrop = 0;
+        foreach (var kv in finalPositions)
+        {
+            int dist = kv.Key.y - kv.Value.y;
+            if (dist > maxDrop) maxDrop = dist;
+        }
+
+        if (maxDrop == 0) yield break;
+
+        float interval = 1.0f / maxDrop;
+
+        for (int step = 0; step < maxDrop; step++)
+        {
+            // y昇順（下のブロックから）処理して上書きを防ぐ
+            var allBlocks = new List<Vector2Int>(finalPositions.Keys);
+            allBlocks.Sort((a, b) => a.y.CompareTo(b.y));
+
+            foreach (var pos in allBlocks)
+            {
+                Vector2Int final = finalPositions[pos];
+                int remaining = pos.y - final.y;
+                if (remaining <= 0) continue;
+
+                field[pos.y - 1, pos.x] = field[pos.y, pos.x];
+                field[pos.y, pos.x] = BlockType.Empty;
+
+                Vector2Int newPos = new Vector2Int(pos.x, pos.y - 1);
+                finalPositions[newPos] = final;
+                finalPositions.Remove(pos);
+
+                // islandリストも更新
+                foreach (var island in islands)
+                {
+                    int idx = island.IndexOf(pos);
+                    if (idx >= 0) { island[idx] = newPos; break; }
+                }
+            }
+
+            yield return new WaitForSeconds(interval);
+        }
     }
 }

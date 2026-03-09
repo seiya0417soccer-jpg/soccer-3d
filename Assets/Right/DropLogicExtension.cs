@@ -13,7 +13,7 @@ public class DropLogicExtension : MonoBehaviour
 
     [Header("E-Key Bomb Settings")]
     // Eキーで出す爆弾のタイプ番号
-    [SerializeField] private int eKeyBombType = 10;
+    [SerializeField] private int eKeyBombType = 11;
 
     // Eキーの入力キー
     [SerializeField] private KeyCode eKey = KeyCode.E;
@@ -63,11 +63,10 @@ public class DropLogicExtension : MonoBehaviour
     {
         if (nextPieceIsEKeyBomb)
         {
-            nextPieceIsEKeyBomb = false; // 1回使用したらフラグリセット
-            return eKeyBombType;          // E爆弾タイプを返す
+            nextPieceIsEKeyBomb = false;
+            return eKeyBombType;
         }
-
-        return defaultType;               // 通常ピースタイプを返す
+        return defaultType;
     }
 
     // ==================================================
