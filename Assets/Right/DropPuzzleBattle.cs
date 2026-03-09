@@ -391,37 +391,47 @@ public class DropPuzzleBattle : MonoBehaviour
     int ClearLines()
     {
         int totalDestroyed = 0;
+        bool changed = true;
 
-        for (int y = 0; y < hight; y++)
+        while (changed)
         {
-            bool full = true;
-            for (int x = 0; x < wide; x++)
-                if (field[y, x] == BlockType.Empty) { full = false; break; }
-            if (!full) continue;
+            changed = false;
 
-            List<Vector2Int> crossBombs = new List<Vector2Int>();
-            for (int x = 0; x < wide; x++)
-                if (field[y, x] == BlockType.CrossBomb) crossBombs.Add(new Vector2Int(x, y));
-
-            for (int x = 0; x < wide; x++)
-                if (field[y, x] != BlockType.Empty) { field[y, x] = BlockType.Empty; totalDestroyed++; }
-
-            for (int yy = y; yy < hight - 1; yy++)
-                for (int x = 0; x < wide; x++)
-                    field[yy, x] = field[yy + 1, x];
-
-            for (int x = 0; x < wide; x++)
-                field[hight - 1, x] = BlockType.Empty;
-
-            foreach (var bomb in crossBombs)
+            for (int y = 0; y < hight; y++)
             {
-                for (int yy = 0; yy < hight; yy++)
-                    totalDestroyed += DestroyCell(bomb.x, yy);
-                for (int xx = 0; xx < wide; xx++)
-                    totalDestroyed += DestroyCell(xx, bomb.y);
-            }
+                bool full = true;
+                for (int x = 0; x < wide; x++)
+                    if (field[y, x] == BlockType.Empty) { full = false; break; }
+                if (!full) continue;
 
-            y--;
+                changed = true;
+
+                // ① CrossBombをシフト前に起爆
+                for (int x = 0; x < wide; x++)
+                {
+                    if (field[y, x] != BlockType.CrossBomb) continue;
+                    field[y, x] = BlockType.Empty;
+                    totalDestroyed++;
+                    for (int yy = 0; yy < hight; yy++)
+                        totalDestroyed += DestroyCell(x, yy);
+                    for (int xx = 0; xx < wide; xx++)
+                        totalDestroyed += DestroyCell(xx, y);
+                }
+
+                // ② ライン消去
+                for (int x = 0; x < wide; x++)
+                    if (field[y, x] != BlockType.Empty) { field[y, x] = BlockType.Empty; totalDestroyed++; }
+
+                // ③ シフトダウン
+                for (int yy = y; yy < hight - 1; yy++)
+                    for (int x = 0; x < wide; x++)
+                        field[yy, x] = field[yy + 1, x];
+
+                for (int x = 0; x < wide; x++)
+                    field[hight - 1, x] = BlockType.Empty;
+
+                y--;
+            }
         }
 
         return totalDestroyed;
