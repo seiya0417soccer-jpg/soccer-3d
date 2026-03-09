@@ -7,7 +7,7 @@ using TMPro;
 /// 
 /// - StartTimer()が呼ばれるまでカウントしない
 /// - 時間切れでGameFlowManager.OnFinish()を呼ぶ
-/// - ResetTimer()でもう一度プレイ時にリセット
+/// - ResetTimer()でもう一度プレイ時にリセット＆テキスト即時更新
 /// </summary>
 public class GameTimer : MonoBehaviour
 {
@@ -28,6 +28,7 @@ public class GameTimer : MonoBehaviour
         timeRemaining = totalTime;
         isGameOver = false;
         isRunning = false;
+        UpdateText(); // 初期テキストを表示
     }
 
     // ==================================================
@@ -42,12 +43,14 @@ public class GameTimer : MonoBehaviour
     // ==================================================
     // ResetTimer: タイマーリセット
     // もう一度プレイ時にGameFlowManagerから呼ばれる
+    // テキストも即時更新して前回の時間が残らないようにする
     // ==================================================
     public void ResetTimer()
     {
         timeRemaining = totalTime; // 残り時間をリセット
         isGameOver = false;     // ゲームオーバーフラグをリセット
         isRunning = false;     // StartTimer()が呼ばれるまで止める
+        UpdateText();              // テキストを即時更新（カウントダウン中に古い時間が見えないよう）
     }
 
     // ==================================================
@@ -66,10 +69,22 @@ public class GameTimer : MonoBehaviour
             timeRemaining = 0f;
             isGameOver = true;
             isRunning = false;
+            UpdateText();
             OnTimeUp(); // 時間切れ処理
+            return;
         }
 
-        // テキスト更新（TMPと標準Text両対応）
+        UpdateText();
+    }
+
+    // ==================================================
+    // UpdateText: タイマーテキストを更新
+    // TMPと標準Text両対応
+    // ==================================================
+    void UpdateText()
+    {
+        if (timerObject == null) return;
+
         string display = FormatTime(timeRemaining);
         var tmp = timerObject.GetComponent<TextMeshProUGUI>();
         var legacy = timerObject.GetComponent<UnityEngine.UI.Text>();

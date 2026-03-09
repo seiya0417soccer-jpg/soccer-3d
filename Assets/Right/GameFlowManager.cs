@@ -31,10 +31,11 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI countdownText; // 3,2,1,GO!を表示するTMPテキスト
 
     [Header("References")]
-    [SerializeField] private GameTimer gameTimer;       // タイマー（GO!後に開始・もう一度でリセット）
+    [SerializeField] private GameTimer gameTimer;        // タイマー（GO!後に開始・もう一度でリセット）
     [SerializeField] private DropPuzzleBattle dropPuzzleBattle; // テトリス（もう一度時にリセット）
-    [SerializeField] private GameObject killCountObject;  // キルカウント表示（終了時に非表示）
-    [SerializeField] private GameObject timerTextObject;  // タイマー表示（終了時に非表示）
+    [SerializeField] private YushaBrain yushaBrain;       // 勇者（もう一度時に初期位置に戻す）
+    [SerializeField] private GameObject killCountObject;   // キルカウント表示（終了時に非表示）
+    [SerializeField] private GameObject timerTextObject;   // タイマー表示（終了時に非表示）
 
     // ==================================================
     // Awake: シングルトン登録
@@ -189,7 +190,7 @@ public class GameFlowManager : MonoBehaviour
     // ==================================================
     // もう一度（カウントダウンから再スタート）
     // ResultManagerから呼ばれる
-    // テトリス・タイマーをリセットしてカウントダウンから再開
+    // テトリス・タイマー・勇者をリセットしてカウントダウンから再開
     // ==================================================
     public void RestartFromCountdown()
     {
@@ -206,8 +207,11 @@ public class GameFlowManager : MonoBehaviour
         // テトリスをリセット（フィールドクリア・ピース再生成）
         dropPuzzleBattle?.ResetGame();
 
-        // タイマーをリセット（残り時間を戻してStartTimer待ち状態に）
+        // タイマーをリセット（残り時間を戻してテキスト即時更新）
         gameTimer?.ResetTimer();
+
+        // 勇者を初期位置に戻す
+        yushaBrain?.ResetPosition();
 
         // カウントダウン開始
         readyGoGroup.SetActive(true);
