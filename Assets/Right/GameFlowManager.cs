@@ -105,4 +105,10 @@ public class GameFlowManager : MonoBehaviour
         Debug.Log("Finish!");
         // TODO: フィニッシュ画面を表示
     }
+    public void OnGameOver()
+    {
+        Time.timeScale = 0f;
+        Debug.Log("Game Over!");
+        // TODO: ゲームオーバー画面を表示
+    }
 }
