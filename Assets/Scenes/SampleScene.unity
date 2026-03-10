@@ -234,7 +234,7 @@ MonoBehaviour:
   gridZ: 0
   lineColor: {r: 1, g: 1, b: 1, a: 0.2}
   lineWidth: 0.05
-  lineMaterial: {fileID: 0}
+  lineMaterial: {fileID: 2100000, guid: eea659f4d1f52bd47ae03b1dae05a18d, type: 2}
 --- !u!4 &24445490
 Transform:
   m_ObjectHideFlags: 0
