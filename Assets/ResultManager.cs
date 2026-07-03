@@ -23,6 +23,14 @@ public class ResultManager : MonoBehaviour
 
     void Awake()
     {
+        // 既にインスタンスが存在する場合は自分を破棄する（重複防止）
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        // 最初の1つだけ登録する
         Instance = this;
     }
 
