@@ -14,64 +14,74 @@ using UnityEngine.AI;
 /// </summary>
 public class YushaBrain : MonoBehaviour
 {
-    private NavMeshAgent agent;
-    private Animator animator;
+    private NavMeshAgent _agent;
+    private Animator _animator;
 
-    public float defaultSpeed = 2f;
-    public float attackDistance = 2.5f; // 攻撃範囲（Inspectorから調整可）
-    public float attackDelay = 0.3f; // 攻撃モーション後にDestroyするまでの待機時間
+    // プランナーがInspectorから調整できるパラメーター
+    [SerializeField] private float _defaultSpeed = 2f;
+    [SerializeField] private float _attackDistance = 2.5f; // 攻撃範囲
+    [SerializeField] private float _attackDelay = 0.3f;    // 攻撃モーション後にDestroyするまでの待機時間
 
-    private const string ParamIsMoving = "IsMoving";    // Bool
-    private const string ParamAttack = "IsAttacking"; // Trigger
+    // defaultSpeedは外部（BattleMainManager）から参照されるので読み取り用プロパティを公開
+    public float DefaultSpeed => _defaultSpeed;
 
-    private Coroutine debuffCoroutine;
-    private bool isAttacking = false; // 攻撃中フラグ（連続攻撃防止）
+    private const string ParamIsMoving = "IsMoving";   // Bool
+    private const string ParamAttack = "IsAttacking";  // Trigger
 
+    private Coroutine _debuffCoroutine;
+    private bool _isAttacking = false; // 攻撃中フラグ（連続攻撃防止）
+
+    // ==================================================
+    // Start: 初期化
+    // ==================================================
     void Start()
     {
-        agent = GetComponent<NavMeshAgent>();
-        animator = GetComponentInChildren<Animator>();
+        _agent = GetComponent<NavMeshAgent>();
+        _animator = GetComponentInChildren<Animator>();
 
-        if (animator == null)
+        if (_animator == null)
             Debug.LogWarning("YushaBrain: Animatorが見つかりません");
         else
-            Debug.Log("YushaBrain: Animator取得OK → " + animator.gameObject.name);
+            Debug.Log("YushaBrain: Animator取得OK → " + _animator.gameObject.name);
 
-        agent.speed = defaultSpeed;
-        agent.Warp(new Vector3(0, 1, 0));
+        _agent.speed = _defaultSpeed;
+        _agent.Warp(new Vector3(0, 1, 0));
     }
 
+    // ==================================================
+    // Update: 毎フレーム敵を追跡・攻撃判定
+    // ==================================================
     void Update()
     {
         GameObject nearest = GetNearestEnemy();
 
         if (nearest != null)
         {
-            agent.SetDestination(nearest.transform.position);
+            _agent.SetDestination(nearest.transform.position);
 
             float dist = Vector3.Distance(transform.position, nearest.transform.position);
 
-            if (dist < attackDistance && !isAttacking)
+            if (dist < _attackDistance && !_isAttacking)
             {
                 // 攻撃範囲内かつ攻撃中でない：攻撃アニメーション→少し待ってDestroy
-                animator?.SetBool(ParamIsMoving, false);
-                animator?.SetTrigger(ParamAttack);
+                _animator?.SetBool(ParamIsMoving, false);
+                _animator?.SetTrigger(ParamAttack);
                 StartCoroutine(DestroyAfterAnim(nearest));
             }
-            else if (!isAttacking)
+            else if (!_isAttacking)
             {
                 // 移動中：Runアニメーション
-                animator?.SetBool(ParamIsMoving, true);
+                _animator?.SetBool(ParamIsMoving, true);
             }
         }
         else
         {
             // 敵がいない：中央待機
-            agent.SetDestination(Vector3.zero);
-            if (!isAttacking)
+            _agent.SetDestination(Vector3.zero);
+            if (!_isAttacking)
             {
-                bool moving = agent.velocity.magnitude > 0.1f;
-                animator?.SetBool(ParamIsMoving, moving);
+                bool moving = _agent.velocity.magnitude > 0.1f;
+                _animator?.SetBool(ParamIsMoving, moving);
             }
         }
     }
@@ -82,19 +92,24 @@ public class YushaBrain : MonoBehaviour
     // ==================================================
     IEnumerator DestroyAfterAnim(GameObject enemy)
     {
-        isAttacking = true;
-        yield return new WaitForSeconds(attackDelay);
+        _isAttacking = true;
+        yield return new WaitForSeconds(_attackDelay);
 
         if (enemy != null)
         {
             Destroy(enemy);
+
+            // ScoreManagerのメソッド経由でスコアを加算（直接書き換え不可）
             ScoreManager.Instance.AddScore(1);
         }
 
-        isAttacking = false;
-        animator?.SetBool(ParamIsMoving, true); // 攻撃後にRunに戻す
+        _isAttacking = false;
+        _animator?.SetBool(ParamIsMoving, true); // 攻撃後にRunに戻す
     }
 
+    // ==================================================
+    // 最も近い敵を取得
+    // ==================================================
     GameObject GetNearestEnemy()
     {
         GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
@@ -113,39 +128,51 @@ public class YushaBrain : MonoBehaviour
         return nearest;
     }
 
+    // ==================================================
+    // 速度バフ適用
+    // BattleMainManagerから呼ぶ
+    // ==================================================
     public void UpdateSpeed(float bonusSpeed)
     {
-        agent.speed = Mathf.Max(0f, defaultSpeed + bonusSpeed);
+        _agent.speed = Mathf.Max(0f, _defaultSpeed + bonusSpeed);
     }
 
+    // ==================================================
+    // Eキーデバフ適用
+    // BattleMainManagerから呼ぶ
+    // ==================================================
     public void ApplyEKeyDebuff(float duration)
     {
-        if (debuffCoroutine != null)
-            StopCoroutine(debuffCoroutine);
-        debuffCoroutine = StartCoroutine(DebuffCoroutine(duration));
+        if (_debuffCoroutine != null)
+            StopCoroutine(_debuffCoroutine);
+        _debuffCoroutine = StartCoroutine(DebuffCoroutine(duration));
     }
 
     private IEnumerator DebuffCoroutine(float duration)
     {
-        float originalSpeed = agent.speed;
-        agent.speed = 0f;
-        animator?.SetBool(ParamIsMoving, false);
+        float originalSpeed = _agent.speed;
+        _agent.speed = 0f;
+        _animator?.SetBool(ParamIsMoving, false);
         yield return new WaitForSeconds(duration);
-        agent.speed = originalSpeed;
-        debuffCoroutine = null;
+        _agent.speed = originalSpeed;
+        _debuffCoroutine = null;
     }
 
+    // ==================================================
+    // 初期位置にリセット
+    // GameFlowManagerから呼ぶ
+    // ==================================================
     public void ResetPosition()
     {
-        agent.Warp(new Vector3(0, 1, 0));
-        agent.speed = defaultSpeed;
-        isAttacking = false;
-        animator?.SetBool(ParamIsMoving, false);
+        _agent.Warp(new Vector3(0, 1, 0));
+        _agent.speed = _defaultSpeed;
+        _isAttacking = false;
+        _animator?.SetBool(ParamIsMoving, false);
 
-        if (debuffCoroutine != null)
+        if (_debuffCoroutine != null)
         {
-            StopCoroutine(debuffCoroutine);
-            debuffCoroutine = null;
+            StopCoroutine(_debuffCoroutine);
+            _debuffCoroutine = null;
         }
     }
 }

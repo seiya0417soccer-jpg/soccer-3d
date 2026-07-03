@@ -88,7 +88,7 @@ public class BattleMainManager : MonoBehaviour
         if (yusha == null) yield break;
 
         isEKeyDebuffActive = true;
-        yusha.UpdateSpeed(-yusha.defaultSpeed); // —EŽÒ‚ð’âŽ~
+        yusha.UpdateSpeed(-yusha.DefaultSpeed); // —EŽÒ‚ð’âŽ~
 
         yield return new WaitForSeconds(duration);
 
