@@ -88,7 +88,7 @@ public class YushaBrain : MonoBehaviour
         if (enemy != null)
         {
             Destroy(enemy);
-            ScoreManager.score += 1;
+            ScoreManager.Instance.AddScore(1);
         }
 
         isAttacking = false;

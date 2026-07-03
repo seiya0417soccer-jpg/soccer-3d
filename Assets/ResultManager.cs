@@ -11,16 +11,24 @@ using UnityEngine.UI;
 /// </summary>
 public class ResultManager : MonoBehaviour
 {
+    // シングルトン：他スクリプトからResultManager.Instanceでアクセス
     public static ResultManager Instance;
 
     [SerializeField] private GameObject resultPanel;
-    [SerializeField] private Text bestScoreText;
-    [SerializeField] private Text nowScoreText;
 
-    private bool isActive = false;
+    // 旧Textコンポーネントを使用（プロジェクトがTMP未対応のため）
+    [SerializeField] private Text _bestScoreText;
+    [SerializeField] private Text _nowScoreText;
 
+    // リザルト画面が表示中かどうかのフラグ
+    private bool _isActive = false;
+
+    // PlayerPrefsのキー定数
     private const string BestScoreKey = "BestScore";
 
+    // ==================================================
+    // Awake: Singleton登録
+    // ==================================================
     void Awake()
     {
         // 既にインスタンスが存在する場合は自分を破棄する（重複防止）
@@ -34,13 +42,18 @@ public class ResultManager : MonoBehaviour
         Instance = this;
     }
 
+    // ==================================================
+    // Update: キー入力でリザルト操作
+    // ==================================================
     void Update()
     {
-        if (!isActive) return;
+        if (!_isActive) return;
 
+        // Enterでもう一度
         if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
             PlayAgain();
 
+        // Backspaceでタイトルへ
         if (Input.GetKeyDown(KeyCode.Backspace))
             GoToTitle();
     }
@@ -52,9 +65,10 @@ public class ResultManager : MonoBehaviour
     public void ShowResult()
     {
         resultPanel.SetActive(true);
-        isActive = true;
+        _isActive = true;
 
-        int currentScore = ScoreManager.score;
+        // ScoreManagerのプロパティ経由で読み取る（直接アクセス不可）
+        int currentScore = ScoreManager.Instance.Score;
 
         // 自己ベスト更新
         int bestScore = PlayerPrefs.GetInt(BestScoreKey, 0);
@@ -65,8 +79,8 @@ public class ResultManager : MonoBehaviour
             PlayerPrefs.Save();
         }
 
-        bestScoreText.text = "自己ベスト: " + bestScore;
-        nowScoreText.text = "今回の記録: " + currentScore;
+        _bestScoreText.text = "自己ベスト: " + bestScore;
+        _nowScoreText.text = "今回の記録: " + currentScore;
     }
 
     // ==================================================
@@ -74,9 +88,12 @@ public class ResultManager : MonoBehaviour
     // ==================================================
     void PlayAgain()
     {
-        isActive = false;
+        _isActive = false;
         resultPanel.SetActive(false);
-        ScoreManager.score = 0;
+
+        // ScoreManagerのメソッド経由でリセット（直接書き換え不可）
+        ScoreManager.Instance.ResetScore();
+
         GameFlowManager.Instance.RestartFromCountdown();
     }
 
@@ -85,9 +102,12 @@ public class ResultManager : MonoBehaviour
     // ==================================================
     void GoToTitle()
     {
-        isActive = false;
+        _isActive = false;
         resultPanel.SetActive(false);
-        ScoreManager.score = 0;
+
+        // ScoreManagerのメソッド経由でリセット（直接書き換え不可）
+        ScoreManager.Instance.ResetScore();
+
         GameFlowManager.Instance.GoToTitle();
     }
 }
