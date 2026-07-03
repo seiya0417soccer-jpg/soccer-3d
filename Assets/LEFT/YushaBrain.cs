@@ -7,7 +7,7 @@ using UnityEngine.AI;
 /// 勇者のAI制御
 /// 
 /// - 最も近い敵を追いかけて攻撃
-/// - 敵がいない場合は中央待機
+/// - 敵が倒されたらEnemySpawnerに通知して次の敵をスポーン
 /// - 移動中はRunアニメーション、攻撃時はAttackアニメーション
 /// - バフ・デバフによる速度変更
 /// - もう一度プレイ時にResetPosition()で初期位置に戻す
@@ -22,7 +22,10 @@ public class YushaBrain : MonoBehaviour
     [SerializeField] private float _attackDistance = 2.5f; // 攻撃範囲
     [SerializeField] private float _attackDelay = 0.3f;    // 攻撃モーション後にDestroyするまでの待機時間
 
-    // defaultSpeedは外部（BattleMainManager）から参照されるので読み取り用プロパティを公開
+    // 敵を倒した時にEnemySpawnerに通知する（イベント駆動スポーン）
+    [SerializeField] private EnemySpawner _enemySpawner;
+
+    // DefaultSpeedは外部（BattleMainManager）から参照されるので読み取り用プロパティを公開
     public float DefaultSpeed => _defaultSpeed;
 
     private const string ParamIsMoving = "IsMoving";   // Bool
@@ -89,6 +92,7 @@ public class YushaBrain : MonoBehaviour
     // ==================================================
     // 攻撃モーションの頭出し後にDestroyする
     // attackDelay秒待ってから敵を消去してスコア加算
+    // EnemySpawnerに通知して次の敵をスポーンさせる
     // ==================================================
     IEnumerator DestroyAfterAnim(GameObject enemy)
     {
@@ -97,6 +101,8 @@ public class YushaBrain : MonoBehaviour
 
         if (enemy != null)
         {
+            // 敵を倒したことをEnemySpawnerに通知（イベント駆動でスポーン）
+            _enemySpawner?.OnEnemyDefeated(enemy);
             Destroy(enemy);
 
             // ScoreManagerのメソッド経由でスコアを加算（直接書き換え不可）
