@@ -11,24 +11,29 @@ using TMPro;
 /// </summary>
 public class GameTimer : MonoBehaviour
 {
-    // 他スクリプトから残り時間を参照できるよう static で公開
-    public static float timeRemaining = 90f;
-    public static bool isGameOver = false;
+    // 残り時間はprivateで管理（外部から直接書き換え不可）
+    private float _timeRemaining;
+    private bool _isGameOver = false;
+    private bool _isRunning = false;
 
-    [SerializeField] private float totalTime = 90f; // ゲーム時間（Inspectorから変更可）
-    public GameObject timerObject;                  // タイマーテキストを持つオブジェクト
+    // 外部からは読み取りのみ可能
+    public float TimeRemaining => _timeRemaining;
+    public bool IsGameOver => _isGameOver;
 
-    private bool isRunning = false; // StartTimer()が呼ばれるまで動かない
+    [SerializeField] private float _totalTime = 90f; // ゲーム時間（Inspectorから変更可）
+
+    // TMPのテキストコンポーネントをキャッシュしておく（毎フレームGetComponentしない）
+    [SerializeField] private TextMeshProUGUI _timerText;
 
     // ==================================================
     // Start: 初期化
     // ==================================================
     void Start()
     {
-        timeRemaining = totalTime;
-        isGameOver = false;
-        isRunning = false;
-        UpdateText(); // 初期テキストを表示
+        _timeRemaining = _totalTime;
+        _isGameOver = false;
+        _isRunning = false;
+        UpdateText();
     }
 
     // ==================================================
@@ -37,20 +42,21 @@ public class GameTimer : MonoBehaviour
     // ==================================================
     public void StartTimer()
     {
-        isRunning = true;
+        _isRunning = true;
     }
 
     // ==================================================
     // ResetTimer: タイマーリセット
     // もう一度プレイ時にGameFlowManagerから呼ばれる
-    // テキストも即時更新して前回の時間が残らないようにする
     // ==================================================
     public void ResetTimer()
     {
-        timeRemaining = totalTime; // 残り時間をリセット
-        isGameOver = false;     // ゲームオーバーフラグをリセット
-        isRunning = false;     // StartTimer()が呼ばれるまで止める
-        UpdateText();              // テキストを即時更新（カウントダウン中に古い時間が見えないよう）
+        _timeRemaining = _totalTime;
+        _isGameOver = false;
+        _isRunning = false;
+
+        // テキストを即時更新（カウントダウン中に古い時間が見えないよう）
+        UpdateText();
     }
 
     // ==================================================
@@ -58,19 +64,18 @@ public class GameTimer : MonoBehaviour
     // ==================================================
     void Update()
     {
-        if (!isRunning) return; // 開始前は何もしない
-        if (isGameOver) return; // 時間切れ後は何もしない
+        if (!_isRunning) return;  // 開始前は何もしない
+        if (_isGameOver) return;  // 時間切れ後は何もしない
 
-        // 残り時間を減らす
-        timeRemaining -= Time.deltaTime;
+        _timeRemaining -= Time.deltaTime;
 
-        if (timeRemaining <= 0f)
+        if (_timeRemaining <= 0f)
         {
-            timeRemaining = 0f;
-            isGameOver = true;
-            isRunning = false;
+            _timeRemaining = 0f;
+            _isGameOver = true;
+            _isRunning = false;
             UpdateText();
-            OnTimeUp(); // 時間切れ処理
+            OnTimeUp();
             return;
         }
 
@@ -79,17 +84,12 @@ public class GameTimer : MonoBehaviour
 
     // ==================================================
     // UpdateText: タイマーテキストを更新
-    // TMPと標準Text両対応
+    // キャッシュしたTMPコンポーネントを使う
     // ==================================================
     void UpdateText()
     {
-        if (timerObject == null) return;
-
-        string display = FormatTime(timeRemaining);
-        var tmp = timerObject.GetComponent<TextMeshProUGUI>();
-        var legacy = timerObject.GetComponent<UnityEngine.UI.Text>();
-        if (tmp != null) tmp.text = display;
-        if (legacy != null) legacy.text = display;
+        if (_timerText != null)
+            _timerText.text = FormatTime(_timeRemaining);
     }
 
     // ==================================================
