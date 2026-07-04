@@ -9,7 +9,7 @@ using VContainer;
 /// - 自己ベストをPlayerPrefsで保存・表示
 /// - Enter: もう一度（カウントダウンから）
 /// - Backspace: タイトルへ
-/// - VContainerでScoreManager・GameFlowManagerを注入
+/// - IScoreReaderでスコード読み取り・IScoreWriterでリセット
 /// </summary>
 public class ResultManager : MonoBehaviour
 {
@@ -28,8 +28,11 @@ public class ResultManager : MonoBehaviour
     // PlayerPrefsのキー定数
     private const string BestScoreKey = "BestScore";
 
+    // IScoreReaderで読み取り・IScoreWriterでリセット（ScoreManager直接参照をやめる）
+    private IScoreReader _scoreReader;
+    private IScoreWriter _scoreWriter;
+
     // VContainerで注入される依存クラス
-    private ScoreManager _scoreManager;
     private GameFlowManager _gameFlowManager;
 
     // ==================================================
@@ -38,7 +41,9 @@ public class ResultManager : MonoBehaviour
     [Inject]
     public void Construct(ScoreManager scoreManager, GameFlowManager gameFlowManager)
     {
-        _scoreManager = scoreManager;
+        // ScoreManagerをIScoreReader・IScoreWriterとして受け取る
+        _scoreReader = scoreManager;
+        _scoreWriter = scoreManager;
         _gameFlowManager = gameFlowManager;
     }
 
@@ -83,8 +88,8 @@ public class ResultManager : MonoBehaviour
         resultPanel.SetActive(true);
         _isActive = true;
 
-        // ScoreManagerのプロパティ経由で読み取る
-        int currentScore = _scoreManager.Score;
+        // IScoreReaderを通してスコアを読み取る（書き換え不可）
+        int currentScore = _scoreReader.Score;
 
         // 自己ベスト更新
         int bestScore = PlayerPrefs.GetInt(BestScoreKey, 0);
@@ -107,8 +112,8 @@ public class ResultManager : MonoBehaviour
         _isActive = false;
         resultPanel.SetActive(false);
 
-        // ScoreManagerのメソッド経由でリセット
-        _scoreManager.ResetScore();
+        // IScoreWriterを通してリセット（直接書き換え不可）
+        _scoreWriter.ResetScore();
 
         _gameFlowManager.RestartFromCountdown();
     }
@@ -121,8 +126,8 @@ public class ResultManager : MonoBehaviour
         _isActive = false;
         resultPanel.SetActive(false);
 
-        // ScoreManagerのメソッド経由でリセット
-        _scoreManager.ResetScore();
+        // IScoreWriterを通してリセット（直接書き換え不可）
+        _scoreWriter.ResetScore();
 
         _gameFlowManager.GoToTitle();
     }

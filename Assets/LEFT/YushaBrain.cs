@@ -11,6 +11,7 @@ using UnityEngine.AI;
 /// - 移動中はRunアニメーション、攻撃時はAttackアニメーション
 /// - バフ・デバフによる速度変更
 /// - もう一度プレイ時にResetPosition()で初期位置に戻す
+/// - IScoreWriterを通してスコアを加算（ScoreManager直接参照をやめる）
 /// </summary>
 public class YushaBrain : MonoBehaviour
 {
@@ -27,6 +28,9 @@ public class YushaBrain : MonoBehaviour
 
     // DefaultSpeedは外部（BattleMainManager）から参照されるので読み取り用プロパティを公開
     public float DefaultSpeed => _defaultSpeed;
+
+    // IScoreWriterを通してスコアを加算する（ScoreManager直接参照をやめる）
+    private IScoreWriter _scoreWriter;
 
     private const string ParamIsMoving = "IsMoving";   // Bool
     private const string ParamAttack = "IsAttacking";  // Trigger
@@ -49,6 +53,9 @@ public class YushaBrain : MonoBehaviour
 
         _agent.speed = _defaultSpeed;
         _agent.Warp(new Vector3(0, 1, 0));
+
+        // ScoreManagerからIScoreWriterとして取得する
+        _scoreWriter = ScoreManager.Instance;
     }
 
     // ==================================================
@@ -105,8 +112,8 @@ public class YushaBrain : MonoBehaviour
             _enemySpawner?.OnEnemyDefeated(enemy);
             Destroy(enemy);
 
-            // ScoreManagerのメソッド経由でスコアを加算（直接書き換え不可）
-            ScoreManager.Instance.AddScore(1);
+            // IScoreWriterを通してスコアを加算（ScoreManager直接参照をやめる）
+            _scoreWriter?.AddScore(1);
         }
 
         _isAttacking = false;
