@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using VContainer;
 
 /// <summary>
 /// ResultManager.cs
@@ -8,6 +9,7 @@ using UnityEngine.UI;
 /// - 自己ベストをPlayerPrefsで保存・表示
 /// - Enter: もう一度（カウントダウンから）
 /// - Backspace: タイトルへ
+/// - VContainerでScoreManager・GameFlowManagerを注入
 /// </summary>
 public class ResultManager : MonoBehaviour
 {
@@ -16,7 +18,7 @@ public class ResultManager : MonoBehaviour
 
     [SerializeField] private GameObject resultPanel;
 
-    // 旧Textコンポーネントを使用（プロジェクトがTMP未対応のため）
+    // 旧Textコンポーネントを使用
     [SerializeField] private Text _bestScoreText;
     [SerializeField] private Text _nowScoreText;
 
@@ -25,6 +27,20 @@ public class ResultManager : MonoBehaviour
 
     // PlayerPrefsのキー定数
     private const string BestScoreKey = "BestScore";
+
+    // VContainerで注入される依存クラス
+    private ScoreManager _scoreManager;
+    private GameFlowManager _gameFlowManager;
+
+    // ==================================================
+    // Inject: VContainerから依存を注入される
+    // ==================================================
+    [Inject]
+    public void Construct(ScoreManager scoreManager, GameFlowManager gameFlowManager)
+    {
+        _scoreManager = scoreManager;
+        _gameFlowManager = gameFlowManager;
+    }
 
     // ==================================================
     // Awake: Singleton登録
@@ -67,8 +83,8 @@ public class ResultManager : MonoBehaviour
         resultPanel.SetActive(true);
         _isActive = true;
 
-        // ScoreManagerのプロパティ経由で読み取る（直接アクセス不可）
-        int currentScore = ScoreManager.Instance.Score;
+        // ScoreManagerのプロパティ経由で読み取る
+        int currentScore = _scoreManager.Score;
 
         // 自己ベスト更新
         int bestScore = PlayerPrefs.GetInt(BestScoreKey, 0);
@@ -91,10 +107,10 @@ public class ResultManager : MonoBehaviour
         _isActive = false;
         resultPanel.SetActive(false);
 
-        // ScoreManagerのメソッド経由でリセット（直接書き換え不可）
-        ScoreManager.Instance.ResetScore();
+        // ScoreManagerのメソッド経由でリセット
+        _scoreManager.ResetScore();
 
-        GameFlowManager.Instance.RestartFromCountdown();
+        _gameFlowManager.RestartFromCountdown();
     }
 
     // ==================================================
@@ -105,9 +121,9 @@ public class ResultManager : MonoBehaviour
         _isActive = false;
         resultPanel.SetActive(false);
 
-        // ScoreManagerのメソッド経由でリセット（直接書き換え不可）
-        ScoreManager.Instance.ResetScore();
+        // ScoreManagerのメソッド経由でリセット
+        _scoreManager.ResetScore();
 
-        GameFlowManager.Instance.GoToTitle();
+        _gameFlowManager.GoToTitle();
     }
 }
