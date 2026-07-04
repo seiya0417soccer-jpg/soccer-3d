@@ -8,6 +8,7 @@ using TMPro;
 /// - StartTimer()が呼ばれるまでカウントしない
 /// - 時間切れでGameFlowManager.OnFinish()を呼ぶ
 /// - ResetTimer()でもう一度プレイ時にリセット＆テキスト即時更新
+/// - GameFlowManagerとの循環依存を避けるためInstance経由で呼ぶ
 /// </summary>
 public class GameTimer : MonoBehaviour
 {
@@ -104,7 +105,7 @@ public class GameTimer : MonoBehaviour
 
     // ==================================================
     // OnTimeUp: 時間切れ処理
-    // GameFlowManagerにフィニッシュを通知
+    // GameFlowManagerとの循環依存を避けるためInstance経由で呼ぶ
     // ==================================================
     void OnTimeUp()
     {
