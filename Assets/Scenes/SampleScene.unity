@@ -1031,6 +1031,54 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 360110757}
   m_CullTransparentMesh: 1
+--- !u!1 &373700727
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 373700729}
+  - component: {fileID: 373700728}
+  m_Layer: 0
+  m_Name: GameLifetimeScopeGameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &373700728
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 373700727}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3617f313ec3acd6499ea0b4b039f9463, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  parentReference:
+    TypeName: 
+  autoRun: 1
+  autoInjectGameObjects: []
+--- !u!4 &373700729
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 373700727}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 3, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &481025811
 GameObject:
   m_ObjectHideFlags: 0
@@ -2928,9 +2976,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 84e4a3f9987c1ab4395459243a8424b0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enemyPrefab: {fileID: 1828400115768527036, guid: bae3550abaf5f544cb7d3e3a1903d4ad, type: 3}
-  maxEnemies: 3
-  spawnRange: 14
+  _enemyPrefab: {fileID: 1828400115768527036, guid: bae3550abaf5f544cb7d3e3a1903d4ad, type: 3}
+  _maxEnemies: 3
+  _spawnRange: 14
 --- !u!4 &1256770940
 Transform:
   m_ObjectHideFlags: 0
@@ -4019,8 +4067,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   resultPanel: {fileID: 1896802113}
-  bestScoreText: {fileID: 1432578865}
-  nowScoreText: {fileID: 1223169897}
+  _bestScoreText: {fileID: 1432578865}
+  _nowScoreText: {fileID: 1223169897}
 --- !u!4 &1682627174
 Transform:
   m_ObjectHideFlags: 0
@@ -4065,7 +4113,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 696077f151933f34f9c365e0c6f50551, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  scoreObject: {fileID: 1885058801}
+  _scoreText: {fileID: 1885058803}
 --- !u!4 &1831282733
 Transform:
   m_ObjectHideFlags: 0
@@ -4433,9 +4481,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 49dfa0d6bf3894c4181b24281096c1d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  defaultSpeed: 3
-  attackDistance: 2.5
-  attackDelay: 0.5
+  _defaultSpeed: 2
+  _attackDistance: 2.5
+  _attackDelay: 0.3
+  _enemySpawner: {fileID: 1256770939}
 --- !u!195 &1913242084
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -5057,8 +5106,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ce66bfba33bae3643bd126e36e883a38, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  totalTime: 90
-  timerObject: {fileID: 1257889909}
+  _totalTime: 90
+  _timerText: {fileID: 1257889911}
 --- !u!4 &2014362956
 Transform:
   m_ObjectHideFlags: 0
@@ -5176,6 +5225,7 @@ SceneRoots:
   - {fileID: 269674633}
   - {fileID: 785673028}
   - {fileID: 885499101}
+  - {fileID: 373700729}
   - {fileID: 1682627174}
   - {fileID: 1525393923}
   - {fileID: 263636509}

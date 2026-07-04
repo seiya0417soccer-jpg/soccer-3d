@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using VContainer;
 
 /// <summary>
 /// GameFlowManager.cs
@@ -30,12 +31,32 @@ public class GameFlowManager : MonoBehaviour
     [Header("ReadyGo")]
     [SerializeField] private TextMeshProUGUI countdownText; // 3,2,1,GO!を表示するTMPテキスト
 
-    [Header("References")]
-    [SerializeField] private GameTimer gameTimer;        // タイマー（GO!後に開始・リセット対応）
-    [SerializeField] private DropPuzzleBattle dropPuzzleBattle; // テトリス（リセット対応）
-    [SerializeField] private YushaBrain yushaBrain;       // 勇者（初期位置リセット対応）
-    [SerializeField] private GameObject killCountObject;   // キルカウント表示（終了時に非表示）
-    [SerializeField] private GameObject timerTextObject;   // タイマー表示（終了時に非表示）
+    [Header("UI")]
+    [SerializeField] private GameObject killCountObject;  // キルカウント表示（終了時に非表示）
+    [SerializeField] private GameObject timerTextObject;  // タイマー表示（終了時に非表示）
+
+    // VContainerでDI注入される依存クラス（SerializeFieldをやめてInjectに変更）
+    private GameTimer _gameTimer;
+    private DropPuzzleBattle _dropPuzzleBattle;
+    private YushaBrain _yushaBrain;
+    private EnemySpawner _enemySpawner;
+
+    // ==================================================
+    // Inject: VContainerから依存を注入される
+    // SerializeFieldの代わりにこちらで依存を受け取る
+    // ==================================================
+    [Inject]
+    public void Construct(
+        GameTimer gameTimer,
+        DropPuzzleBattle dropPuzzleBattle,
+        YushaBrain yushaBrain,
+        EnemySpawner enemySpawner)
+    {
+        _gameTimer = gameTimer;
+        _dropPuzzleBattle = dropPuzzleBattle;
+        _yushaBrain = yushaBrain;
+        _enemySpawner = enemySpawner;
+    }
 
     // ==================================================
     // Awake: シングルトン登録
@@ -120,14 +141,12 @@ public class GameFlowManager : MonoBehaviour
         Time.timeScale = 1f; // ゲーム開始
 
         // タイマーのカウントを開始
-        if (gameTimer != null)
-            gameTimer.StartTimer();
+        _gameTimer?.StartTimer();
     }
 
     // ==================================================
     // フィニッシュ（時間切れ）
     // GameTimerから呼ばれる
-    // エンターキーが押されるまでフィニッシュ画面を表示し続ける
     // ==================================================
     public void OnFinish()
     {
@@ -138,7 +157,7 @@ public class GameFlowManager : MonoBehaviour
         StartCoroutine(WaitForFinishInput());
     }
 
-    // フィニッシュ：エンターキー待ち（時間制限なし）
+    // フィニッシュ：エンターキー待ち
     IEnumerator WaitForFinishInput()
     {
         while (true)
@@ -155,7 +174,6 @@ public class GameFlowManager : MonoBehaviour
     // ==================================================
     // ゲームオーバー
     // DropPuzzleBattleから呼ばれる
-    // 3秒経過 または エンターキーでリザルトへ
     // ==================================================
     public void OnGameOver()
     {
@@ -172,16 +190,15 @@ public class GameFlowManager : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < 3f)
         {
-            // エンターキーで即リザルトへ
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
             {
                 GoToResult();
                 yield break;
             }
-            elapsed += Time.unscaledDeltaTime; // timeScale=0でも動くunscaledDeltaTimeを使用
+            elapsed += Time.unscaledDeltaTime;
             yield return null;
         }
-        GoToResult(); // 3秒経過で自動遷移
+        GoToResult();
     }
 
     // ==================================================
@@ -192,13 +209,12 @@ public class GameFlowManager : MonoBehaviour
     {
         gameOverPanel.SetActive(false);
         finishPanel.SetActive(false);
-        ResultManager.Instance.ShowResult(); // リザルト画面を表示してスコアを反映
+        ResultManager.Instance.ShowResult();
     }
 
     // ==================================================
     // もう一度（カウントダウンから再スタート）
     // ResultManagerから呼ばれる
-    // テトリス・タイマー・勇者をリセットしてカウントダウンから再開
     // ==================================================
     public void RestartFromCountdown()
     {
@@ -212,14 +228,17 @@ public class GameFlowManager : MonoBehaviour
         killCountObject?.SetActive(true);
         timerTextObject?.SetActive(true);
 
-        // テトリスをリセット（フィールドクリア・ピース再生成）
-        dropPuzzleBattle?.ResetGame();
+        // テトリスをリセット
+        _dropPuzzleBattle?.ResetGame();
 
-        // タイマーをリセット（残り時間を戻してテキスト即時更新）
-        gameTimer?.ResetTimer();
+        // タイマーをリセット
+        _gameTimer?.ResetTimer();
 
         // 勇者を初期位置に戻す
-        yushaBrain?.ResetPosition();
+        _yushaBrain?.ResetPosition();
+
+        // 敵を全リセットして再スポーン
+        _enemySpawner?.ResetEnemies();
 
         // カウントダウン開始
         readyGoGroup.SetActive(true);
@@ -229,7 +248,6 @@ public class GameFlowManager : MonoBehaviour
     // ==================================================
     // タイトルへ戻る
     // ResultManagerから呼ばれる
-    // テトリス・タイマー・勇者をリセットしてタイトルへ
     // ==================================================
     public void GoToTitle()
     {
@@ -240,14 +258,17 @@ public class GameFlowManager : MonoBehaviour
         killCountObject?.SetActive(true);
         timerTextObject?.SetActive(true);
 
-        // テトリスをリセット（フィールドクリア・ピース再生成）
-        dropPuzzleBattle?.ResetGame();
+        // テトリスをリセット
+        _dropPuzzleBattle?.ResetGame();
 
-        // タイマーをリセット（残り時間を戻してテキスト即時更新）
-        gameTimer?.ResetTimer();
+        // タイマーをリセット
+        _gameTimer?.ResetTimer();
 
         // 勇者を初期位置に戻す
-        yushaBrain?.ResetPosition();
+        _yushaBrain?.ResetPosition();
+
+        // 敵を全リセットして再スポーン
+        _enemySpawner?.ResetEnemies();
 
         Time.timeScale = 0f;
         titlePanel.SetActive(true);
