@@ -5,12 +5,13 @@ using UnityEngine.UI;
 /// ScoreManager.cs
 /// キル数（スコア）の管理とUI表示
 /// 
+/// - IScoreReaderで読み取り・IScoreWriterで書き込みを分離
 /// - scoreはprivateでカプセル化（外部から直接書き換え不可）
 /// - AddScore()で加算・ResetScore()でリセット
 /// - Score プロパティで読み取りのみ可能
-/// - スコアが変わった時だけUIを更新する（毎フレームGetComponentをやめる）
+/// - スコアが変わった時だけUIを更新する
 /// </summary>
-public class ScoreManager : MonoBehaviour
+public class ScoreManager : MonoBehaviour, IScoreReader, IScoreWriter
 {
     // シングルトン：他スクリプトからScoreManager.Instanceでアクセス
     public static ScoreManager Instance;
@@ -18,7 +19,7 @@ public class ScoreManager : MonoBehaviour
     // スコアはprivateで管理（外部から直接書き換えできない）
     private int _score = 0;
 
-    // 外部からは読み取りのみ可能
+    // IScoreReader：外部からは読み取りのみ可能
     public int Score => _score;
 
     // 旧TextコンポーネントをキャッシュしておくI（毎フレームGetComponentしない）
@@ -50,7 +51,7 @@ public class ScoreManager : MonoBehaviour
     }
 
     // ==================================================
-    // スコア加算
+    // IScoreWriter：スコア加算
     // 外部からはこのメソッドを通してスコアを変更する
     // ==================================================
     public void AddScore(int amount)
@@ -62,7 +63,7 @@ public class ScoreManager : MonoBehaviour
     }
 
     // ==================================================
-    // スコアリセット
+    // IScoreWriter：スコアリセット
     // ResultManagerから呼ぶ
     // ==================================================
     public void ResetScore()

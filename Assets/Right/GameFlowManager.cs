@@ -138,10 +138,9 @@ public class GameFlowManager : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.8f);
 
         readyGoGroup.SetActive(false);
-        Time.timeScale = 1f;
+        Time.timeScale = 1f; // ゲーム開始
 
-        // デバッグ用：_gameTimerがnullかどうか確認
-        Debug.Log($"_gameTimer: {_gameTimer}");
+        // タイマーのカウントを開始
         _gameTimer?.StartTimer();
     }
 
