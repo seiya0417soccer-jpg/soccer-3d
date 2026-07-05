@@ -7,9 +7,8 @@ using VContainer;
 /// リザルト画面の表示・操作管理
 /// - 今回のキル数表示
 /// - 自己ベストをPlayerPrefsで保存・表示
-/// - Enter: もう一度（カウントダウンから）
-/// - Backspace: タイトルへ
-/// - IScoreReaderでスコード読み取り・IScoreWriterでリセット
+/// - キー入力はResultStateで管理する（Stateパターンに移管）
+/// - IScoreReaderでスコア読み取り・IScoreWriterでリセット
 /// </summary>
 public class ResultManager : MonoBehaviour
 {
@@ -22,18 +21,12 @@ public class ResultManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI _bestScoreText;
     [SerializeField] private TextMeshProUGUI _nowScoreText;
 
-    // リザルト画面が表示中かどうかのフラグ
-    private bool _isActive = false;
-
     // PlayerPrefsのキー定数
     private const string BestScoreKey = "BestScore";
 
     // IScoreReaderで読み取り・IScoreWriterでリセット（ScoreManager直接参照をやめる）
     private IScoreReader _scoreReader;
     private IScoreWriter _scoreWriter;
-
-    // VContainerで注入される依存クラス
-    private GameFlowManager _gameFlowManager;
 
     // ==================================================
     // Inject: VContainerから依存を注入される
@@ -44,7 +37,6 @@ public class ResultManager : MonoBehaviour
         // ScoreManagerをIScoreReader・IScoreWriterとして受け取る
         _scoreReader = scoreManager;
         _scoreWriter = scoreManager;
-        _gameFlowManager = gameFlowManager;
     }
 
     // ==================================================
@@ -64,29 +56,12 @@ public class ResultManager : MonoBehaviour
     }
 
     // ==================================================
-    // Update: キー入力でリザルト操作
-    // ==================================================
-    void Update()
-    {
-        if (!_isActive) return;
-
-        // Enterでもう一度
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-            PlayAgain();
-
-        // Backspaceでタイトルへ
-        if (Input.GetKeyDown(KeyCode.Backspace))
-            GoToTitle();
-    }
-
-    // ==================================================
     // リザルト表示
-    // GameFlowManagerから呼ぶ
+    // ResultStateのEnterから呼ぶ
     // ==================================================
     public void ShowResult()
     {
         resultPanel.SetActive(true);
-        _isActive = true;
 
         // IScoreReaderを通してスコアを読み取る（書き換え不可）
         int currentScore = _scoreReader.Score;
@@ -105,30 +80,21 @@ public class ResultManager : MonoBehaviour
     }
 
     // ==================================================
-    // もう一度（カウントダウンから再スタート）
+    // リザルト非表示
+    // ResultStateのExitから呼ぶ
     // ==================================================
-    void PlayAgain()
+    public void HideResult()
     {
-        _isActive = false;
         resultPanel.SetActive(false);
-
-        // IScoreWriterを通してリセット（直接書き換え不可）
-        _scoreWriter.ResetScore();
-
-        _gameFlowManager.RestartFromCountdown();
     }
 
     // ==================================================
-    // タイトルへ
+    // スコアリセット
+    // RestartFromCountdown・GoToTitleから呼ぶ
     // ==================================================
-    void GoToTitle()
+    public void ResetScore()
     {
-        _isActive = false;
-        resultPanel.SetActive(false);
-
         // IScoreWriterを通してリセット（直接書き換え不可）
         _scoreWriter.ResetScore();
-
-        _gameFlowManager.GoToTitle();
     }
 }

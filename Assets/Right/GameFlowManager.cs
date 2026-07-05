@@ -1,6 +1,5 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
 using VContainer;
 
@@ -8,13 +7,11 @@ using VContainer;
 /// GameFlowManager.cs
 /// ゲーム全体のフロー管理
 /// 
+/// Stateパターンで状態を管理する
 /// 画面遷移の流れ：
-/// タイトル → 操作説明 → カウントダウン → ゲーム中
-/// ゲーム中 → ゲームオーバー or フィニッシュ → リザルト
-/// リザルト → もう一度（カウントダウンから） or タイトルへ
-/// 
-/// カウントダウン中・ゲームオーバー・フィニッシュ中は
-/// Time.timeScale = 0 で全ての動きを停止
+/// TitleState → ManualState → CountdownState → PlayingState
+/// PlayingState → GameOverState or FinishState → ResultState
+/// ResultState → CountdownState or TitleState
 /// </summary>
 public class GameFlowManager : MonoBehaviour
 {
@@ -35,15 +32,17 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private GameObject killCountObject;  // キルカウント表示（終了時に非表示）
     [SerializeField] private GameObject timerTextObject;  // タイマー表示（終了時に非表示）
 
-    // VContainerでDI注入される依存クラス（SerializeFieldをやめてInjectに変更）
+    // VContainerでDI注入される依存クラス
     private GameTimer _gameTimer;
     private DropPuzzleBattle _dropPuzzleBattle;
     private YushaBrain _yushaBrain;
     private EnemySpawner _enemySpawner;
 
+    // 現在のゲーム状態（Stateパターン）
+    private IGameState _currentState;
+
     // ==================================================
     // Inject: VContainerから依存を注入される
-    // SerializeFieldの代わりにこちらで依存を受け取る
     // ==================================================
     [Inject]
     public void Construct(
@@ -75,59 +74,78 @@ public class GameFlowManager : MonoBehaviour
     }
 
     // ==================================================
-    // Start: 初期状態設定
-    // 全停止・タイトル表示・他パネルを非表示
+    // Start: 初期状態をTitleStateに設定
     // ==================================================
     void Start()
     {
-        Time.timeScale = 0f; // 全停止（タイトル表示中はゲームを動かさない）
-        titlePanel.SetActive(true);
+        // 全パネルを非表示にしてからTitleStateに入る
+        titlePanel.SetActive(false);
         manualPanel.SetActive(false);
         readyGoGroup.SetActive(false);
         gameOverPanel.SetActive(false);
         finishPanel.SetActive(false);
+
+        // 最初の状態はタイトル画面
+        ChangeState(new TitleState(this));
     }
 
     // ==================================================
-    // Update: エンターキーで画面遷移
-    // タイトルまたは操作説明が表示中のみ反応
+    // Update: 現在の状態のUpdateを呼ぶ
     // ==================================================
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-        {
-            if (titlePanel.activeSelf)
-                OnTitleStart();
-            else if (manualPanel.activeSelf)
-                OnManualNext();
-        }
+        // 現在の状態のUpdateに処理を委譲する
+        _currentState?.Update();
     }
 
     // ==================================================
-    // タイトル画面：エンターキーで操作説明へ
+    // ChangeState: 状態を切り替える
+    // 現在の状態のExit→新しい状態のEnterを呼ぶ
     // ==================================================
-    public void OnTitleStart()
+    public void ChangeState(IGameState newState)
     {
-        titlePanel.SetActive(false);
-        manualPanel.SetActive(true);
+        // 現在の状態のExit処理を呼ぶ
+        _currentState?.Exit();
+
+        // 新しい状態に切り替えてEnter処理を呼ぶ
+        _currentState = newState;
+        _currentState.Enter();
     }
 
     // ==================================================
-    // 操作説明画面：エンターキーでカウントダウンへ
+    // パネル表示切替メソッド群
+    // 各StateクラスのEnter・Exitから呼ばれる
     // ==================================================
-    public void OnManualNext()
+    public void ShowTitlePanel(bool show) => titlePanel.SetActive(show);
+    public void ShowManualPanel(bool show) => manualPanel.SetActive(show);
+    public void ShowReadyGoPanel(bool show) => readyGoGroup.SetActive(show);
+    public void ShowGameOverPanel(bool show) => gameOverPanel.SetActive(show);
+    public void ShowFinishPanel(bool show) => finishPanel.SetActive(show);
+
+    // キルカウント・タイマーの表示切替
+    public void ShowInGameUI(bool show)
     {
-        manualPanel.SetActive(false);
-        readyGoGroup.SetActive(true);
+        killCountObject?.SetActive(show);
+        timerTextObject?.SetActive(show);
+    }
+
+    // ==================================================
+    // StartCountdown: カウントダウンを開始する
+    // CountdownStateのEnterから呼ばれる
+    // ==================================================
+    public void StartCountdown()
+    {
         StartCoroutine(CountdownCoroutine());
     }
 
     // ==================================================
-    // カウントダウン → GO! → ゲーム開始
+    // カウントダウン → GO! → PlayingStateへ遷移
     // Time.timeScale = 0 中でも動くWaitForSecondsRealtimeを使用
     // ==================================================
     IEnumerator CountdownCoroutine()
     {
+        Time.timeScale = 0f; // カウントダウン中は止める
+
         countdownText.text = "3";
         yield return new WaitForSecondsRealtime(1f);
         countdownText.text = "2";
@@ -137,140 +155,76 @@ public class GameFlowManager : MonoBehaviour
         countdownText.text = "GO!";
         yield return new WaitForSecondsRealtime(0.8f);
 
-        readyGoGroup.SetActive(false);
-        Time.timeScale = 1f; // ゲーム開始
+        // カウントダウン完了→PlayingStateへ遷移
+        ChangeState(new PlayingState(this));
+    }
 
-        // タイマーのカウントを開始
+    // ==================================================
+    // StartGameTimer: タイマーを開始する
+    // PlayingStateのEnterから呼ばれる
+    // ==================================================
+    public void StartGameTimer()
+    {
         _gameTimer?.StartTimer();
     }
 
     // ==================================================
-    // フィニッシュ（時間切れ）
-    // GameTimerから呼ばれる
+    // OnFinish: 時間切れ時にGameTimerから呼ばれる
     // ==================================================
     public void OnFinish()
     {
-        Time.timeScale = 0f;
-        killCountObject?.SetActive(false); // キルカウントを非表示
-        timerTextObject?.SetActive(false); // タイマーを非表示
-        finishPanel.SetActive(true);
-        StartCoroutine(WaitForFinishInput());
-    }
-
-    // フィニッシュ：エンターキー待ち
-    IEnumerator WaitForFinishInput()
-    {
-        while (true)
-        {
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-            {
-                GoToResult();
-                yield break;
-            }
-            yield return null;
-        }
+        ChangeState(new FinishState(this));
     }
 
     // ==================================================
-    // ゲームオーバー
-    // DropPuzzleBattleから呼ばれる
+    // OnGameOver: ゲームオーバー時にDropPuzzleBattleから呼ばれる
     // ==================================================
     public void OnGameOver()
     {
-        Time.timeScale = 0f;
-        killCountObject?.SetActive(false); // キルカウントを非表示
-        timerTextObject?.SetActive(false); // タイマーを非表示
-        gameOverPanel.SetActive(true);
-        StartCoroutine(WaitForGameOverTransition());
-    }
-
-    // ゲームオーバー：3秒待機またはエンターキーでリザルトへ
-    IEnumerator WaitForGameOverTransition()
-    {
-        float elapsed = 0f;
-        while (elapsed < 3f)
-        {
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-            {
-                GoToResult();
-                yield break;
-            }
-            elapsed += Time.unscaledDeltaTime;
-            yield return null;
-        }
-        GoToResult();
+        ChangeState(new GameOverState(this));
     }
 
     // ==================================================
-    // リザルト画面へ遷移
-    // ゲームオーバー・フィニッシュ両方から呼ばれる
-    // ==================================================
-    void GoToResult()
-    {
-        gameOverPanel.SetActive(false);
-        finishPanel.SetActive(false);
-        ResultManager.Instance.ShowResult();
-    }
-
-    // ==================================================
-    // もう一度（カウントダウンから再スタート）
-    // ResultManagerから呼ばれる
+    // RestartFromCountdown: もう一度プレイ
+    // ResultStateから呼ばれる
     // ==================================================
     public void RestartFromCountdown()
     {
-        // 全パネルを非表示
-        titlePanel.SetActive(false);
-        manualPanel.SetActive(false);
-        gameOverPanel.SetActive(false);
-        finishPanel.SetActive(false);
-
-        // キルカウントとタイマーを再表示
-        killCountObject?.SetActive(true);
-        timerTextObject?.SetActive(true);
-
-        // テトリスをリセット
+        // 各システムをリセット
         _dropPuzzleBattle?.ResetGame();
-
-        // タイマーをリセット
         _gameTimer?.ResetTimer();
-
-        // 勇者を初期位置に戻す
         _yushaBrain?.ResetPosition();
-
-        // 敵を全リセットして再スポーン
         _enemySpawner?.ResetEnemies();
 
-        // カウントダウン開始
-        readyGoGroup.SetActive(true);
-        StartCoroutine(CountdownCoroutine());
+        // スコアをリセット
+        ScoreManager.Instance?.ResetScore();
+
+        // インゲームUIを再表示
+        ShowInGameUI(true);
+
+        // カウントダウン状態へ遷移
+        ChangeState(new CountdownState(this));
     }
 
     // ==================================================
-    // タイトルへ戻る
-    // ResultManagerから呼ばれる
+    // GoToTitle: タイトルへ戻る
+    // ResultStateから呼ばれる
     // ==================================================
     public void GoToTitle()
     {
-        gameOverPanel.SetActive(false);
-        finishPanel.SetActive(false);
-
-        // キルカウントとタイマーを再表示
-        killCountObject?.SetActive(true);
-        timerTextObject?.SetActive(true);
-
-        // テトリスをリセット
+        // 各システムをリセット
         _dropPuzzleBattle?.ResetGame();
-
-        // タイマーをリセット
         _gameTimer?.ResetTimer();
-
-        // 勇者を初期位置に戻す
         _yushaBrain?.ResetPosition();
-
-        // 敵を全リセットして再スポーン
         _enemySpawner?.ResetEnemies();
 
-        Time.timeScale = 0f;
-        titlePanel.SetActive(true);
+        // スコアをリセット
+        ScoreManager.Instance?.ResetScore();
+
+        // インゲームUIを再表示
+        ShowInGameUI(true);
+
+        // タイトル状態へ遷移
+        ChangeState(new TitleState(this));
     }
 }
