@@ -1,5 +1,5 @@
 using UnityEngine;
-using UnityEngine.UI;
+using TMPro;
 
 /// <summary>
 /// ScoreManager.cs
@@ -22,8 +22,8 @@ public class ScoreManager : MonoBehaviour, IScoreReader, IScoreWriter
     // IScoreReader：外部からは読み取りのみ可能
     public int Score => _score;
 
-    // 旧TextコンポーネントをキャッシュしておくI（毎フレームGetComponentしない）
-    [SerializeField] private Text _scoreText;
+    // TMPコンポーネントをキャッシュしておく（毎フレームGetComponentしない）
+    [SerializeField] private TextMeshProUGUI _scoreText;
 
     // ==================================================
     // Awake: Singleton登録

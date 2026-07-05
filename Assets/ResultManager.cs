@@ -1,5 +1,5 @@
 using UnityEngine;
-using UnityEngine.UI;
+using TMPro;
 using VContainer;
 
 /// <summary>
@@ -18,9 +18,9 @@ public class ResultManager : MonoBehaviour
 
     [SerializeField] private GameObject resultPanel;
 
-    // 旧Textコンポーネントを使用
-    [SerializeField] private Text _bestScoreText;
-    [SerializeField] private Text _nowScoreText;
+    // TMPコンポーネントをキャッシュしておく（毎フレームGetComponentしない）
+    [SerializeField] private TextMeshProUGUI _bestScoreText;
+    [SerializeField] private TextMeshProUGUI _nowScoreText;
 
     // リザルト画面が表示中かどうかのフラグ
     private bool _isActive = false;
@@ -100,8 +100,8 @@ public class ResultManager : MonoBehaviour
             PlayerPrefs.Save();
         }
 
-        _bestScoreText.text = "自己ベスト: " + bestScore;
-        _nowScoreText.text = "今回の記録: " + currentScore;
+        _bestScoreText.text = "Best Score: " + bestScore;
+        _nowScoreText.text = "Now Score: " + currentScore;
     }
 
     // ==================================================
