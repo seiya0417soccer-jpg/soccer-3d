@@ -103,6 +103,10 @@ public class BattleMainManager : MonoBehaviour
     {
         if (_eKeyDebuffCoroutine != null)
             StopCoroutine(_eKeyDebuffCoroutine);
+
+        // YushaBrainのデバフも同時に適用する
+        _yusha?.ApplyEKeyDebuff(duration);
+
         _eKeyDebuffCoroutine = StartCoroutine(EKeyDebuffCoroutine(duration));
     }
 

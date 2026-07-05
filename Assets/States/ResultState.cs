@@ -35,11 +35,11 @@ public class ResultState : IGameState
         {
             _gameFlowManager.RestartFromCountdown();
         }
-
         // Backspaceでタイトルへ
         if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Backspace))
         {
-            _gameFlowManager.ChangeState(new TitleState(_gameFlowManager));
+            // GoToTitle()を通してリセット処理を行う
+            _gameFlowManager.GoToTitle();
         }
     }
 

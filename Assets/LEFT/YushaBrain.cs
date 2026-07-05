@@ -10,6 +10,7 @@ using UnityEngine.AI;
 /// - 敵が倒されたらEnemySpawnerに通知して次の敵をスポーン
 /// - 移動中はRunアニメーション、攻撃時はAttackアニメーション
 /// - バフ・デバフによる速度変更
+/// - デバフ中はUpdate処理をスキップしてアニメーションが上書きされないようにする
 /// - もう一度プレイ時にResetPosition()で初期位置に戻す
 /// - IScoreWriterを通してスコアを加算（ScoreManager直接参照をやめる）
 /// </summary>
@@ -36,7 +37,8 @@ public class YushaBrain : MonoBehaviour
     private const string ParamAttack = "IsAttacking";  // Trigger
 
     private Coroutine _debuffCoroutine;
-    private bool _isAttacking = false; // 攻撃中フラグ（連続攻撃防止）
+    private bool _isAttacking = false;   // 攻撃中フラグ（連続攻撃防止）
+    private bool _isDebuffActive = false; // デバフ中フラグ（Update処理をスキップする）
 
     // ==================================================
     // Start: 初期化
@@ -60,9 +62,13 @@ public class YushaBrain : MonoBehaviour
 
     // ==================================================
     // Update: 毎フレーム敵を追跡・攻撃判定
+    // デバフ中はスキップしてアニメーションが上書きされないようにする
     // ==================================================
     void Update()
     {
+        // デバフ中はUpdate処理をスキップ（足踏みアニメーション防止）
+        if (_isDebuffActive) return;
+
         GameObject nearest = GetNearestEnemy();
 
         if (nearest != null)
@@ -161,13 +167,20 @@ public class YushaBrain : MonoBehaviour
         _debuffCoroutine = StartCoroutine(DebuffCoroutine(duration));
     }
 
+    // ==================================================
+    // デバフCoroutine
+    // デバフ中フラグをtrueにしてUpdateをスキップさせる
+    // デバフ終了後にフラグをfalseに戻す
+    // ==================================================
     private IEnumerator DebuffCoroutine(float duration)
     {
         float originalSpeed = _agent.speed;
         _agent.speed = 0f;
-        _animator?.SetBool(ParamIsMoving, false);
+        _isDebuffActive = true;                        // デバフ開始・Updateをスキップ
+        _animator?.SetBool(ParamIsMoving, false);      // 足踏みアニメーションを止める
         yield return new WaitForSeconds(duration);
         _agent.speed = originalSpeed;
+        _isDebuffActive = false;                       // デバフ終了・Updateを再開
         _debuffCoroutine = null;
     }
 
@@ -180,6 +193,7 @@ public class YushaBrain : MonoBehaviour
         _agent.Warp(new Vector3(0, 1, 0));
         _agent.speed = _defaultSpeed;
         _isAttacking = false;
+        _isDebuffActive = false;                       // デバフフラグもリセット
         _animator?.SetBool(ParamIsMoving, false);
 
         if (_debuffCoroutine != null)
