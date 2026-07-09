@@ -14,6 +14,7 @@ using UnityEngine.AI;
 /// - もう一度プレイ時にResetPosition()で初期位置に戻す
 /// - IScoreWriterを通してスコアを加算（ScoreManager直接参照をやめる）
 /// - 敵を倒した時にCameraFollowのShakeCamera()を呼んで画面を揺らす
+/// - バフ量に応じてシアン色に発光・デバフ時に赤く発光する
 /// </summary>
 public class YushaBrain : MonoBehaviour
 {
@@ -36,6 +37,10 @@ public class YushaBrain : MonoBehaviour
 
     // IScoreWriterを通してスコアを加算する（ScoreManager直接参照をやめる）
     private IScoreWriter _scoreWriter;
+
+    // 発光制御用のSkinnedMeshRenderer・マテリアル
+    private SkinnedMeshRenderer _meshRenderer;
+    private Material _material; // 元のマテリアルを汚さないようにコピーして使う
 
     private const string ParamIsMoving = "IsMoving";   // Bool
     private const string ParamAttack = "IsAttacking";  // Trigger
@@ -62,6 +67,16 @@ public class YushaBrain : MonoBehaviour
 
         // ScoreManagerからIScoreWriterとして取得する
         _scoreWriter = ScoreManager.Instance;
+
+        // SkinnedMeshRendererを取得してマテリアルをコピーする
+        // 元のマテリアルを汚さないようにコピーして使う
+        _meshRenderer = GetComponentInChildren<SkinnedMeshRenderer>();
+        if (_meshRenderer != null)
+        {
+            _material = new Material(_meshRenderer.material);
+            _meshRenderer.material = _material;
+            _material.EnableKeyword("_EMISSION");
+        }
     }
 
     // ==================================================
@@ -164,6 +179,36 @@ public class YushaBrain : MonoBehaviour
     }
 
     // ==================================================
+    // 発光強度を設定する
+    // BattleMainManagerからバフ量に応じて呼ぶ
+    // intensityが0なら発光なし・大きいほど強く光る
+    // ==================================================
+    public void SetEmission(float intensity)
+    {
+        if (_material == null) return;
+
+        // バフ時はシアン色で発光
+        Color emissionColor = Color.cyan * intensity;
+        _material.SetColor("_EmissionColor", emissionColor);
+    }
+
+    // ==================================================
+    // デバフ時の発光色を設定する
+    // デバフ中は赤く光らせる
+    // ==================================================
+    public void SetDebuffEmission(bool isDebuff)
+    {
+        if (_material == null) return;
+
+        if (isDebuff)
+            // デバフ中は赤く光る
+            _material.SetColor("_EmissionColor", Color.red * 1.5f);
+        else
+            // デバフ解除後は発光なしに戻す
+            _material.SetColor("_EmissionColor", Color.black);
+    }
+
+    // ==================================================
     // Eキーデバフ適用
     // BattleMainManagerから呼ぶ
     // ==================================================
@@ -185,9 +230,11 @@ public class YushaBrain : MonoBehaviour
         _agent.speed = 0f;
         _isDebuffActive = true;                        // デバフ開始・Updateをスキップ
         _animator?.SetBool(ParamIsMoving, false);      // 足踏みアニメーションを止める
+        SetDebuffEmission(true);                       // デバフ中は赤く光る
         yield return new WaitForSeconds(duration);
         _agent.speed = originalSpeed;
         _isDebuffActive = false;                       // デバフ終了・Updateを再開
+        SetDebuffEmission(false);                      // デバフ解除後は発光なしに戻す
         _debuffCoroutine = null;
     }
 
@@ -202,6 +249,7 @@ public class YushaBrain : MonoBehaviour
         _isAttacking = false;
         _isDebuffActive = false;                       // デバフフラグもリセット
         _animator?.SetBool(ParamIsMoving, false);
+        SetDebuffEmission(false);                      // リセット時に発光をリセット
 
         if (_debuffCoroutine != null)
         {

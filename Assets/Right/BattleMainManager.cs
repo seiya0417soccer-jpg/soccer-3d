@@ -130,7 +130,13 @@ public class BattleMainManager : MonoBehaviour
     {
         if (_yusha == null) return;
         if (_isEKeyDebuffActive) return; // デバフ中はバフを反映しない
-        _yusha.UpdateSpeed(TotalBonusSpeed);
+
+        float bonusSpeed = TotalBonusSpeed;
+        _yusha.UpdateSpeed(bonusSpeed);
+
+        // バフ量に応じて発光強度を変える（最大3倍速で最大発光）
+        float emissionIntensity = Mathf.Clamp01(bonusSpeed / 3f);
+        _yusha.SetEmission(emissionIntensity);
     }
 
     // ==================================================
