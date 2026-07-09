@@ -5,28 +5,27 @@ using UnityEngine;
 /// EnemySpawner.cs
 /// 敵をフィールドに生成・管理するクラス
 /// 
+/// - EnemySettingSOからパラメーターを取得する（プランナーが調整可能）
 /// - 敵が倒されたらOnEnemyDefeated()で通知を受けてスポーン
 /// - Updateで毎フレームチェックする方式をやめてイベント駆動に変更
-/// - 最大数に達するまで初回スポーンはStart()で行う
 /// </summary>
 public class EnemySpawner : MonoBehaviour
 {
-    // 敵のプレハブ（SerializeField privateでカプセル化）
+    // 敵のプレハブ
     [SerializeField] private GameObject _enemyPrefab;
-    [SerializeField] private int _maxEnemies = 3;    // 同時に存在する敵の最大数
-    [SerializeField] private float _spawnRange = 14f; // スポーン範囲
+
+    // プランナーが調整できるパラメーターをSOで管理
+    [SerializeField] private EnemySettingSO _enemySettingSO;
 
     // 生存中の敵リスト
     private List<GameObject> _enemies = new List<GameObject>();
 
     // ==================================================
     // Start: 初回スポーン
-    // 最大数に達するまで敵を生成する
     // ==================================================
     void Start()
     {
-        // 初回は最大数まで一気にスポーン
-        for (int i = 0; i < _maxEnemies; i++)
+        for (int i = 0; i < _enemySettingSO.MaxEnemies; i++)
             Spawn();
     }
 
@@ -36,11 +35,9 @@ public class EnemySpawner : MonoBehaviour
     // ==================================================
     public void OnEnemyDefeated(GameObject defeatedEnemy)
     {
-        // 倒された敵をリストから除去
         _enemies.Remove(defeatedEnemy);
 
-        // 最大数に達していなければ新しい敵をスポーン
-        if (_enemies.Count < _maxEnemies)
+        if (_enemies.Count < _enemySettingSO.MaxEnemies)
             Spawn();
     }
 
@@ -55,8 +52,8 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
-        float x = Random.Range(-_spawnRange, _spawnRange);
-        float z = Random.Range(-_spawnRange, _spawnRange);
+        float x = Random.Range(-_enemySettingSO.SpawnRange, _enemySettingSO.SpawnRange);
+        float z = Random.Range(-_enemySettingSO.SpawnRange, _enemySettingSO.SpawnRange);
         Vector3 pos = new Vector3(x, 0.5f, z);
 
         GameObject enemy = Instantiate(_enemyPrefab, pos, Quaternion.identity);
@@ -74,8 +71,7 @@ public class EnemySpawner : MonoBehaviour
 
         _enemies.Clear();
 
-        // リセット後に最大数まで再スポーン
-        for (int i = 0; i < _maxEnemies; i++)
+        for (int i = 0; i < _enemySettingSO.MaxEnemies; i++)
             Spawn();
     }
 }
