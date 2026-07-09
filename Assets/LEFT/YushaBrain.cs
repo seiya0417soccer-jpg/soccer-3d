@@ -13,6 +13,7 @@ using UnityEngine.AI;
 /// - デバフ中はUpdate処理をスキップしてアニメーションが上書きされないようにする
 /// - もう一度プレイ時にResetPosition()で初期位置に戻す
 /// - IScoreWriterを通してスコアを加算（ScoreManager直接参照をやめる）
+/// - 敵を倒した時にCameraFollowのShakeCamera()を呼んで画面を揺らす
 /// </summary>
 public class YushaBrain : MonoBehaviour
 {
@@ -26,6 +27,9 @@ public class YushaBrain : MonoBehaviour
 
     // 敵を倒した時にEnemySpawnerに通知する（イベント駆動スポーン）
     [SerializeField] private EnemySpawner _enemySpawner;
+
+    // 敵を倒した時にカメラを揺らす
+    [SerializeField] private CameraFollow _cameraFollow;
 
     // DefaultSpeedは外部（BattleMainManager）から参照されるので読み取り用プロパティを公開
     public float DefaultSpeed => _defaultSpeed;
@@ -120,6 +124,9 @@ public class YushaBrain : MonoBehaviour
 
             // IScoreWriterを通してスコアを加算（ScoreManager直接参照をやめる）
             _scoreWriter?.AddScore(1);
+
+            // 敵を倒した時にカメラを揺らして倒してる感を出す
+            _cameraFollow?.ShakeCamera();
         }
 
         _isAttacking = false;

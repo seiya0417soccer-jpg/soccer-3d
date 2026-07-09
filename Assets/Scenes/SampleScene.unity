@@ -2098,8 +2098,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: acc60c1243238a745a8c83ba61b963f9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  target: {fileID: 1913242088}
-  offset: {x: 0, y: 15, z: -10}
+  _target: {fileID: 1913242088}
+  _offset: {x: 0, y: 15, z: -10}
+  _shakeDuration: 0.2
+  _shakeMagnitude: 0.3
 --- !u!1 &984433822
 GameObject:
   m_ObjectHideFlags: 0
@@ -4646,6 +4648,7 @@ MonoBehaviour:
   _attackDistance: 2.5
   _attackDelay: 0.3
   _enemySpawner: {fileID: 1256770939}
+  _cameraFollow: {fileID: 963194229}
 --- !u!195 &1913242084
 NavMeshAgent:
   m_ObjectHideFlags: 0

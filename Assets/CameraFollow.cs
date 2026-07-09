@@ -1,16 +1,77 @@
+using System.Collections;
 using UnityEngine;
 
+/// <summary>
+/// CameraFollow.cs
+/// 勇者を追いかけるカメラ制御
+/// 
+/// - 勇者の位置にオフセットを加えてカメラを追従させる
+/// - ShakeCamera()で画面揺れを発生させる（敵を倒した時などに呼ぶ）
+/// </summary>
 public class CameraFollow : MonoBehaviour
 {
-    public Transform target; // 追いかける勇者
-    public Vector3 offset = new Vector3(0, 15, -10); // 勇者からの距離
+    // 追いかける対象（勇者）
+    [SerializeField] private Transform _target;
 
+    // 勇者からのオフセット距離
+    [SerializeField] private Vector3 _offset = new Vector3(0, 15, -10);
+
+    [Header("Camera Shake Settings")]
+    [SerializeField] private float _shakeDuration = 0.2f;  // 揺れの時間
+    [SerializeField] private float _shakeMagnitude = 0.3f; // 揺れの強さ
+
+    // シェイク中フラグ
+    private bool _isShaking = false;
+
+    // ==================================================
+    // LateUpdate: 毎フレーム勇者を追いかける
+    // Updateより後に実行されるのでキャラの移動後に追従できる
+    // ==================================================
     void LateUpdate()
     {
-        if (target != null)
+        if (_target == null) return;
+
+        // シェイク中はShakeCoroutineが位置を制御するのでスキップ
+        if (_isShaking) return;
+
+        // 勇者の位置にオフセットを加えてカメラを配置
+        transform.position = _target.position + _offset;
+    }
+
+    // ==================================================
+    // ShakeCamera: カメラを揺らす
+    // 敵を倒した時にYushaBrainから呼ぶ
+    // ==================================================
+    public void ShakeCamera()
+    {
+        // 既にシェイク中なら一旦止めて再度シェイク
+        if (_isShaking)
+            StopAllCoroutines();
+
+        StartCoroutine(ShakeCoroutine());
+    }
+
+    // ==================================================
+    // ShakeCoroutine: 一定時間カメラをランダムに揺らす
+    // ==================================================
+    IEnumerator ShakeCoroutine()
+    {
+        _isShaking = true;
+
+        float elapsed = 0f;
+
+        while (elapsed < _shakeDuration)
         {
-            // 勇者の位置 ＋ 決まった距離 ＝ カメラの位置（回転は無視！）
-            transform.position = target.position + offset;
+            // ランダムな方向に揺らす
+            Vector3 randomOffset = Random.insideUnitSphere * _shakeMagnitude;
+            transform.position = _target.position + _offset + randomOffset;
+
+            elapsed += Time.deltaTime;
+            yield return null;
         }
+
+        // シェイク終了後に元の位置に戻す
+        transform.position = _target.position + _offset;
+        _isShaking = false;
     }
 }
