@@ -15,16 +15,15 @@ using UnityEngine.AI;
 /// - IScoreWriterを通してスコアを加算（ScoreManager直接参照をやめる）
 /// - 敵を倒した時にCameraFollowのShakeCamera()を呼んで画面を揺らす
 /// - バフ量に応じてシアン色に発光・デバフ時に赤く発光する
+/// - YushaSettingSOでパラメーターを管理（プランナーが調整可能）
 /// </summary>
 public class YushaBrain : MonoBehaviour
 {
     private NavMeshAgent _agent;
     private Animator _animator;
 
-    // プランナーがInspectorから調整できるパラメーター
-    [SerializeField] private float _defaultSpeed = 2f;
-    [SerializeField] private float _attackDistance = 2.5f; // 攻撃範囲
-    [SerializeField] private float _attackDelay = 0.3f;    // 攻撃モーション後にDestroyするまでの待機時間
+    // プランナーが調整できるパラメーターをSOで管理
+    [SerializeField] private YushaSettingSO _yushaSettingSO;
 
     // 敵を倒した時にEnemySpawnerに通知する（イベント駆動スポーン）
     [SerializeField] private EnemySpawner _enemySpawner;
@@ -33,7 +32,7 @@ public class YushaBrain : MonoBehaviour
     [SerializeField] private CameraFollow _cameraFollow;
 
     // DefaultSpeedは外部（BattleMainManager）から参照されるので読み取り用プロパティを公開
-    public float DefaultSpeed => _defaultSpeed;
+    public float DefaultSpeed => _yushaSettingSO.DefaultSpeed;
 
     // IScoreWriterを通してスコアを加算する（ScoreManager直接参照をやめる）
     private IScoreWriter _scoreWriter;
@@ -62,7 +61,10 @@ public class YushaBrain : MonoBehaviour
         else
             Debug.Log("YushaBrain: Animator取得OK → " + _animator.gameObject.name);
 
-        _agent.speed = _defaultSpeed;
+        if (_yushaSettingSO == null)
+            Debug.LogError("YushaBrain: YushaSettingSOがセットされていません！");
+
+        _agent.speed = _yushaSettingSO.DefaultSpeed;
         _agent.Warp(new Vector3(0, 1, 0));
 
         // ScoreManagerからIScoreWriterとして取得する
@@ -96,7 +98,7 @@ public class YushaBrain : MonoBehaviour
 
             float dist = Vector3.Distance(transform.position, nearest.transform.position);
 
-            if (dist < _attackDistance && !_isAttacking)
+            if (dist < _yushaSettingSO.AttackDistance && !_isAttacking)
             {
                 // 攻撃範囲内かつ攻撃中でない：攻撃アニメーション→少し待ってDestroy
                 _animator?.SetBool(ParamIsMoving, false);
@@ -129,7 +131,7 @@ public class YushaBrain : MonoBehaviour
     IEnumerator DestroyAfterAnim(GameObject enemy)
     {
         _isAttacking = true;
-        yield return new WaitForSeconds(_attackDelay);
+        yield return new WaitForSeconds(_yushaSettingSO.AttackDelay);
 
         if (enemy != null)
         {
@@ -175,7 +177,7 @@ public class YushaBrain : MonoBehaviour
     // ==================================================
     public void UpdateSpeed(float bonusSpeed)
     {
-        _agent.speed = Mathf.Max(0f, _defaultSpeed + bonusSpeed);
+        _agent.speed = Mathf.Max(0f, _yushaSettingSO.DefaultSpeed + bonusSpeed);
     }
 
     // ==================================================
@@ -245,7 +247,7 @@ public class YushaBrain : MonoBehaviour
     public void ResetPosition()
     {
         _agent.Warp(new Vector3(0, 1, 0));
-        _agent.speed = _defaultSpeed;
+        _agent.speed = _yushaSettingSO.DefaultSpeed;
         _isAttacking = false;
         _isDebuffActive = false;                       // デバフフラグもリセット
         _animator?.SetBool(ParamIsMoving, false);

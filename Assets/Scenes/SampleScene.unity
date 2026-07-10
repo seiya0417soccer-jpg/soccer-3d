@@ -4642,9 +4642,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 49dfa0d6bf3894c4181b24281096c1d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _defaultSpeed: 2
-  _attackDistance: 2.5
-  _attackDelay: 0.3
+  _yushaSettingSO: {fileID: 11400000, guid: 107219f0b28321f43aadcdccc735f2ca, type: 2}
   _enemySpawner: {fileID: 1256770939}
   _cameraFollow: {fileID: 963194229}
 --- !u!195 &1913242084
