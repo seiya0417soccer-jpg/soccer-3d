@@ -1602,8 +1602,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 49e5d9371cb2c804c829d48caaa87995, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _secondsPerBlock: 0.3
-  _speedPerBlock: 0.2
+  _battleSettingSO: {fileID: 11400000, guid: ec344beea87edef4b94862c476fd651e, type: 2}
 --- !u!4 &785673028
 Transform:
   m_ObjectHideFlags: 0
@@ -3030,8 +3029,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _enemyPrefab: {fileID: 1828400115768527036, guid: bae3550abaf5f544cb7d3e3a1903d4ad, type: 3}
-  _maxEnemies: 3
-  _spawnRange: 14
+  _enemySettingSO: {fileID: 11400000, guid: eac78d2cf03f02b46be421964b8cb3a0, type: 2}
 --- !u!4 &1256770940
 Transform:
   m_ObjectHideFlags: 0

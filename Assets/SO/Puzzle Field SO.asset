@@ -9,8 +9,8 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 487870417e5da1841b0b5a3f63ae8a02, type: 3}
-  m_Name: New CameraSettingSO
+  m_Script: {fileID: 11500000, guid: eb33f1ef8f659634abb49439538282ea, type: 3}
+  m_Name: Puzzle Field SO
   m_EditorClassIdentifier: 
-  orthographicSize: 13
-  cameraZ: -24
+  hight: 22
+  wide: 13

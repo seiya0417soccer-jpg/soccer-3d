@@ -9,8 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eb33f1ef8f659634abb49439538282ea, type: 3}
-  m_Name: New Puzzle Field SO
+  m_Script: {fileID: 11500000, guid: 97abcb57482d7ca41bfcfe2744d440c4, type: 3}
+  m_Name: BattleSettingSO
   m_EditorClassIdentifier: 
-  hight: 22
-  wide: 13
+  _secondsPerBlock: 0.3
+  _speedPerBlock: 0.2
+  _eKeyDebuffDuration: 5

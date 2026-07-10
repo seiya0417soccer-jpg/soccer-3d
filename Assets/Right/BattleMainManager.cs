@@ -10,15 +10,15 @@ using VContainer;
 /// - ブロック破壊数に応じて勇者にスピードバフを付与
 /// - EキーBomb発動時に勇者にデバフを付与
 /// - VContainerでYushaBrainを注入（SerializeField依存をなくす）
+/// - BattleSettingSOでパラメーターを管理（プランナーが調整可能）
 /// </summary>
 public class BattleMainManager : MonoBehaviour
 {
     // シングルトン：他スクリプトからBattleMainManager.Instanceでアクセス
     public static BattleMainManager Instance;
 
-    [Header("Buff Balance")]
-    [SerializeField] private float _secondsPerBlock = 0.3f; // ブロック1個あたりのバフ持続時間
-    [SerializeField] private float _speedPerBlock = 0.2f;   // ブロック1個あたりの速度バフ量
+    // プランナーが調整できるパラメーターをSOで管理
+    [SerializeField] private BattleSettingSO _battleSettingSO;
 
     // VContainerで注入される依存クラス
     private YushaBrain _yusha;
@@ -73,6 +73,8 @@ public class BattleMainManager : MonoBehaviour
     {
         if (_yusha == null)
             Debug.LogError("BattleMainManager: YushaBrainが注入されていません！");
+        if (_battleSettingSO == null)
+            Debug.LogError("BattleMainManager: BattleSettingSOがセットされていません！");
     }
 
     // ==================================================
@@ -80,8 +82,8 @@ public class BattleMainManager : MonoBehaviour
     // ==================================================
     public void OnBlocksDestroyed(int destroyedCount)
     {
-        float duration = destroyedCount * _secondsPerBlock;
-        float speedAmount = destroyedCount * _speedPerBlock;
+        float duration = destroyedCount * _battleSettingSO.SecondsPerBlock;
+        float speedAmount = destroyedCount * _battleSettingSO.SpeedPerBlock;
         StartCoroutine(SpeedBuffCoroutine(duration, speedAmount));
     }
 
@@ -105,9 +107,9 @@ public class BattleMainManager : MonoBehaviour
             StopCoroutine(_eKeyDebuffCoroutine);
 
         // YushaBrainのデバフも同時に適用する
-        _yusha?.ApplyEKeyDebuff(duration);
+        _yusha?.ApplyEKeyDebuff(_battleSettingSO.EKeyDebuffDuration);
 
-        _eKeyDebuffCoroutine = StartCoroutine(EKeyDebuffCoroutine(duration));
+        _eKeyDebuffCoroutine = StartCoroutine(EKeyDebuffCoroutine(_battleSettingSO.EKeyDebuffDuration));
     }
 
     IEnumerator EKeyDebuffCoroutine(float duration)
