@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using R3;
 
 /// <summary>
 /// DropPuzzleBattle.cs
@@ -13,8 +14,9 @@ using UnityEngine;
 /// - EKeyBomb爆発（5×5範囲・連鎖対応）
 /// - 浮き島検出（FloodFill）→落下アニメーション→連鎖消去
 /// - ゲームオーバー検出→GameFlowManagerへ通知
+/// - IPuzzleFieldを実装してバトル側との疎結合を実現（R3）
 /// </summary>
-public class DropPuzzleBattle : MonoBehaviour
+public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
 {
     // ==================================================
     // BlockType enum: フィールド上のブロック種別
@@ -37,7 +39,7 @@ public class DropPuzzleBattle : MonoBehaviour
         EKeyBomb = 11, // Eキー爆弾（5×5範囲）
     }
 
-    // グリッド表示用Prefab（typo修正：GridPrefub → _gridPrefab）
+    // グリッド表示用Prefab
     [SerializeField] private GameObject _gridPrefab;
 
     // フィールドサイズ定義（ScriptableObject）
@@ -59,6 +61,19 @@ public class DropPuzzleBattle : MonoBehaviour
 
     // ピース固定時に外部へ通知するイベント
     public event System.Action OnPieceFixed;
+
+    // ==================================================
+    // IPuzzleField実装：R3のSubjectでイベントを発火する
+    // BattleMainManagerはこのSubjectを購読してバフ・デバフを適用する
+    // ==================================================
+    private readonly Subject<int> _onBlocksDestroyed = new Subject<int>();
+    private readonly Subject<Unit> _onEKeyBombExploded = new Subject<Unit>();
+    private readonly Subject<Unit> _onGameOver = new Subject<Unit>();
+
+    // 外部から購読できるようにプロパティとして公開
+    public Subject<int> OnBlocksDestroyed => _onBlocksDestroyed;
+    public Subject<Unit> OnEKeyBombExploded => _onEKeyBombExploded;
+    public Subject<Unit> OnGameOver => _onGameOver;
 
     // 落下中ピースの状態
     private Vector2Int[] currentShape; // 現在のピース形状（相対座標配列）
@@ -85,6 +100,9 @@ public class DropPuzzleBattle : MonoBehaviour
 
     // DropLogicExtensionへの参照（EKeyBomb発動などの拡張ロジック）
     private DropLogicExtension cachedLogic;
+
+    // CrossBombになるブロックのインデックスセット
+    private HashSet<int> crossBombBlockIndices = new HashSet<int>();
 
     // ==================================================
     // Start: 初期化
@@ -115,6 +133,17 @@ public class DropPuzzleBattle : MonoBehaviour
 
         CreateWall(); // フィールド外周の壁を生成
         SpawnPiece(); // 最初のピースを生成
+    }
+
+    // ==================================================
+    // OnDestroy: Subjectを破棄する
+    // ==================================================
+    void OnDestroy()
+    {
+        // メモリリーク防止のためSubjectを破棄する
+        _onBlocksDestroyed.Dispose();
+        _onEKeyBombExploded.Dispose();
+        _onGameOver.Dispose();
     }
 
     // ==================================================
@@ -171,9 +200,6 @@ public class DropPuzzleBattle : MonoBehaviour
         Draw(); // フィールドと落下中ピースを描画
     }
 
-    // CrossBombになるブロックのインデックスセット
-    private HashSet<int> crossBombBlockIndices = new HashSet<int>();
-
     // ==================================================
     // ピース生成
     // ランダム（またはExtensionから指定）でピースを生成して上部に配置
@@ -216,7 +242,9 @@ public class DropPuzzleBattle : MonoBehaviour
         {
             Debug.Log("Game Over");
             enabled = false; // このスクリプトのUpdateを止める
-            GameFlowManager.Instance?.OnGameOver();
+
+            // R3のSubjectでゲームオーバーを通知（Instance直接呼び出しをやめる）
+            _onGameOver.OnNext(Unit.Default);
         }
     }
 
@@ -251,15 +279,15 @@ public class DropPuzzleBattle : MonoBehaviour
             bool eKeyHit = bombDestroyed > 0;
             destroyedBlocks += bombDestroyed;
 
-            // EKeyBombが爆発した場合はデバフを適用
-            if (eKeyHit && BattleMainManager.Instance != null)
-                BattleMainManager.Instance.ApplyEKeyDebuff(5f);
+            // EKeyBombが爆発した場合はSubjectで通知（疎結合）
+            if (eKeyHit)
+                _onEKeyBombExploded.OnNext(Unit.Default);
 
             cachedLogic?.OnEKeyBombFinished();
 
-            // 消去ブロック数をBattleMainManagerに通知（バフ計算用）
-            if (!skipDestroyedNotification && destroyedBlocks > 0 && BattleMainManager.Instance != null)
-                BattleMainManager.Instance.OnBlocksDestroyed(destroyedBlocks);
+            // 消去ブロック数をSubjectで通知（疎結合）
+            if (!skipDestroyedNotification && destroyedBlocks > 0)
+                _onBlocksDestroyed.OnNext(destroyedBlocks);
 
             // 浮き島処理→連鎖消去→次のピース生成のコルーチン開始
             StartCoroutine(ProcessIslandsThenSpawn());
@@ -288,8 +316,8 @@ public class DropPuzzleBattle : MonoBehaviour
 
             // 着地後にラインが揃っていれば消去（連鎖）
             int destroyed = ClearLines();
-            if (destroyed > 0 && !skipDestroyedNotification && BattleMainManager.Instance != null)
-                BattleMainManager.Instance.OnBlocksDestroyed(destroyed);
+            if (destroyed > 0 && !skipDestroyedNotification)
+                _onBlocksDestroyed.OnNext(destroyed);
 
             if (destroyed == 0) break; // 消去がなければ連鎖終了
         }
