@@ -1,3 +1,5 @@
+using R3;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -23,6 +25,9 @@ public class BattleMainManager : MonoBehaviour
     // VContainerで注入される依存クラス
     private YushaBrain _yusha;
 
+    // IPuzzleFieldを購読する（VContainerで注入される）
+    private IPuzzleField _puzzleField;
+
     // 現在有効なバフエントリのリスト
     private List<BuffEntry> _activeBuffs = new List<BuffEntry>();
 
@@ -45,9 +50,10 @@ public class BattleMainManager : MonoBehaviour
     // Inject: VContainerから依存を注入される
     // ==================================================
     [Inject]
-    public void Construct(YushaBrain yusha)
+    public void Construct(YushaBrain yusha, IPuzzleField puzzleField)
     {
         _yusha = yusha;
+        _puzzleField = puzzleField;
     }
 
     // ==================================================
@@ -75,6 +81,15 @@ public class BattleMainManager : MonoBehaviour
             Debug.LogError("BattleMainManager: YushaBrainが注入されていません！");
         if (_battleSettingSO == null)
             Debug.LogError("BattleMainManager: BattleSettingSOがセットされていません！");
+
+        // IPuzzleFieldのSubjectを購読してバフ・デバフを適用する
+        _puzzleField.OnBlocksDestroyed
+            .Subscribe(count => OnBlocksDestroyed(count))
+            .AddTo(this);
+
+        _puzzleField.OnEKeyBombExploded
+            .Subscribe(_ => ApplyEKeyDebuff(_battleSettingSO.EKeyDebuffDuration))
+            .AddTo(this);
     }
 
     // ==================================================
