@@ -1,8 +1,8 @@
-using System.Collections;
-using UnityEngine;
-using TMPro;
-using VContainer;
 using R3;
+using System.Collections;
+using TMPro;
+using UnityEngine;
+using VContainer;
 
 /// <summary>
 /// GameFlowManager.cs
@@ -187,14 +187,6 @@ public class GameFlowManager : MonoBehaviour
     public void OnFinish()
     {
         ChangeState(new FinishState(this));
-    }
-
-    // ==================================================
-    // OnGameOver: ゲームオーバー時にDropPuzzleBattleから呼ばれる
-    // ==================================================
-    public void OnGameOver()
-    {
-        ChangeState(new GameOverState(this));
     }
 
     // ==================================================
