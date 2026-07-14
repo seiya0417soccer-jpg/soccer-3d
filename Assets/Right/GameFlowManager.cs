@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using TMPro;
 using VContainer;
+using R3;
 
 /// <summary>
 /// GameFlowManager.cs
@@ -38,6 +39,9 @@ public class GameFlowManager : MonoBehaviour
     private YushaBrain _yushaBrain;
     private EnemySpawner _enemySpawner;
 
+    // IPuzzleFieldを購読する（VContainerで注入される）
+    private IPuzzleField _puzzleField;
+
     // 現在のゲーム状態（Stateパターン）
     private IGameState _currentState;
 
@@ -49,12 +53,16 @@ public class GameFlowManager : MonoBehaviour
         GameTimer gameTimer,
         DropPuzzleBattle dropPuzzleBattle,
         YushaBrain yushaBrain,
-        EnemySpawner enemySpawner)
+        EnemySpawner enemySpawner,
+        IPuzzleField puzzleField)
     {
         _gameTimer = gameTimer;
         _dropPuzzleBattle = dropPuzzleBattle;
         _yushaBrain = yushaBrain;
         _enemySpawner = enemySpawner;
+
+        // IPuzzleFieldをInjectで受け取る
+        _puzzleField = puzzleField;
     }
 
     // ==================================================
@@ -78,6 +86,11 @@ public class GameFlowManager : MonoBehaviour
     // ==================================================
     void Start()
     {
+        // IPuzzleFieldのゲームオーバーSubjectを購読する
+        // DropPuzzleBattleを直接知らずにゲームオーバーを検知できる（疎結合）
+        _puzzleField.OnGameOver
+            .Subscribe(_ => ChangeState(new GameOverState(this)));
+
         // 全パネルを非表示にしてからTitleStateに入る
         titlePanel.SetActive(false);
         manualPanel.SetActive(false);
