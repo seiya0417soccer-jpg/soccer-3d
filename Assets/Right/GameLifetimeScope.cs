@@ -15,10 +15,10 @@ public class GameLifetimeScope : LifetimeScope
         builder.RegisterComponentInHierarchy<GameFlowManager>();
         builder.RegisterComponentInHierarchy<BattleMainManager>();
         builder.RegisterComponentInHierarchy<ResultManager>();
-        builder.RegisterComponentInHierarchy<ScoreManager>();
         builder.RegisterComponentInHierarchy<GameTimer>();
         builder.RegisterComponentInHierarchy<YushaBrain>();
         builder.RegisterComponentInHierarchy<EnemySpawner>();
         builder.RegisterComponentInHierarchy<DropPuzzleBattle>().AsSelf().As<IPuzzleField>();
+        builder.RegisterComponentInHierarchy<ScoreManager>().AsSelf().As<IScoreWriter>().As<IScoreReader>();
     }
 }

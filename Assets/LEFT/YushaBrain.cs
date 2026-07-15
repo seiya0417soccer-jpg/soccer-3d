@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
+using VContainer;
 
 /// <summary>
 /// YushaBrain.cs
@@ -21,6 +22,16 @@ public class YushaBrain : MonoBehaviour
 {
     private NavMeshAgent _agent;
     private Animator _animator;
+
+    // ==================================================
+    // Inject: VContainerから依存を注入される
+    // ==================================================
+    [Inject]
+    public void Construct(IScoreWriter scoreWriter)
+    {
+        // IScoreWriterをInjectで受け取る（ScoreManager.Instance直接参照をやめる）
+        _scoreWriter = scoreWriter;
+    }
 
     // プランナーが調整できるパラメーターをSOで管理
     [SerializeField] private YushaSettingSO _yushaSettingSO;
