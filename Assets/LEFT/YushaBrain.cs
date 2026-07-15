@@ -78,9 +78,6 @@ public class YushaBrain : MonoBehaviour
         _agent.speed = _yushaSettingSO.DefaultSpeed;
         _agent.Warp(new Vector3(0, 1, 0));
 
-        // ScoreManagerからIScoreWriterとして取得する
-        _scoreWriter = ScoreManager.Instance;
-
         // SkinnedMeshRendererを取得してマテリアルをコピーする
         // 元のマテリアルを汚さないようにコピーして使う
         _meshRenderer = GetComponentInChildren<SkinnedMeshRenderer>();
