@@ -87,9 +87,12 @@ public class GameFlowManager : MonoBehaviour
     void Start()
     {
         // IPuzzleFieldのゲームオーバーSubjectを購読する
-        // DropPuzzleBattleを直接知らずにゲームオーバーを検知できる（疎結合）
         _puzzleField.OnGameOver
             .Subscribe(_ => ChangeState(new GameOverState(this)));
+
+        // GameTimerの時間切れSubjectを購読する
+        _gameTimer.OnTimeUp
+            .Subscribe(_ => ChangeState(new FinishState(this)));
 
         // 全パネルを非表示にしてからTitleStateに入る
         titlePanel.SetActive(false);
@@ -179,14 +182,6 @@ public class GameFlowManager : MonoBehaviour
     public void StartGameTimer()
     {
         _gameTimer?.StartTimer();
-    }
-
-    // ==================================================
-    // OnFinish: 時間切れ時にGameTimerから呼ばれる
-    // ==================================================
-    public void OnFinish()
-    {
-        ChangeState(new FinishState(this));
     }
 
     // ==================================================
