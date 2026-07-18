@@ -29,6 +29,9 @@ public class GameOverState : IGameState
         _elapsed = 0f;
         _gameFlowManager.ShowGameOverPanel(true);
         _gameFlowManager.ShowInGameUI(false); // キルカウント・タイマーを非表示
+
+        // シェイク中だった場合に揺れっぱなしにならないよう停止する
+        _gameFlowManager.StopYushaCameraShake();
     }
 
     // ==================================================

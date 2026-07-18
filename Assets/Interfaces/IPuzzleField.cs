@@ -7,19 +7,20 @@ using R3;
 /// - 実装を差し替えることで別のパズルゲームに変更できる
 /// - DropPuzzleBattleはこのInterfaceを実装する
 /// - バトル側はこのInterfaceを通してパズル側を知る
-/// - R3のSubjectでイベントを発火する（疎結合）
+/// - R3のObservableで公開（外部からOnNext()できないよう読み取り専用にする）
 /// </summary>
 public interface IPuzzleField
 {
     // ゲームリセット時に呼ぶ
     void ResetGame();
 
-    // ブロックが消去された時に発火するSubject（消去ブロック数を通知）
-    Subject<int> OnBlocksDestroyed { get; }
+    // ブロックが消去された時に発火するObservable（消去ブロック数を通知）
+    // 読み取り専用にすることで外部から不正にOnNext()できないようにする
+    Observable<int> OnBlocksDestroyed { get; }
 
-    // EKeyBombが爆発した時に発火するSubject
-    Subject<Unit> OnEKeyBombExploded { get; }
+    // EKeyBombが爆発した時に発火するObservable
+    Observable<Unit> OnEKeyBombExploded { get; }
 
-    // ゲームオーバーになった時に発火するSubject
-    Subject<Unit> OnGameOver { get; }
+    // ゲームオーバーになった時に発火するObservable
+    Observable<Unit> OnGameOver { get; }
 }

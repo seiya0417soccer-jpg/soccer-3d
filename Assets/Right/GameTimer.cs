@@ -27,9 +27,11 @@ public class GameTimer : MonoBehaviour
     // TMPのテキストコンポーネントをキャッシュしておく（毎フレームGetComponentしない）
     [SerializeField] private TextMeshProUGUI _timerText;
 
-    // 時間切れを通知するSubject（GameFlowManagerが購読する）
+    // 時間切れを通知するSubject（発火する権利はGameTimerだけが持つ）
     private readonly Subject<Unit> _onTimeUp = new Subject<Unit>();
-    public Subject<Unit> OnTimeUp => _onTimeUp;
+
+    // 外部からは読み取り専用のObservableとして公開（OnNext()は外部からできない）
+    public Observable<Unit> OnTimeUp => _onTimeUp;
 
     // ==================================================
     // Start: 初期化

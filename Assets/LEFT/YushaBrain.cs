@@ -267,4 +267,15 @@ public class YushaBrain : MonoBehaviour
             _debuffCoroutine = null;
         }
     }
+
+    // ==================================================
+    // カメラシェイクを強制停止する
+    // GameOverState・FinishStateから呼ぶ
+    // シェイク中にゲームオーバー/フィニッシュになった場合、
+    // 揺れっぱなしにならないようにする
+    // ==================================================
+    public void StopCameraShake()
+    {
+        _cameraFollow?.StopShake();
+    }
 }

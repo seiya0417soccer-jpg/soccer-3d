@@ -24,6 +24,9 @@ public class FinishState : IGameState
         UnityEngine.Time.timeScale = 0f;
         _gameFlowManager.ShowFinishPanel(true);
         _gameFlowManager.ShowInGameUI(false); // キルカウント・タイマーを非表示
+
+        // シェイク中だった場合に揺れっぱなしにならないよう停止する
+        _gameFlowManager.StopYushaCameraShake();
     }
 
     // ==================================================

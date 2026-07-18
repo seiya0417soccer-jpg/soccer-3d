@@ -7,6 +7,7 @@ using UnityEngine;
 /// 
 /// - 勇者の位置にオフセットを加えてカメラを追従させる
 /// - ShakeCamera()で画面揺れを発生させる（敵を倒した時などに呼ぶ）
+/// - StopShake()でシェイクを強制停止する（ゲームオーバー・フィニッシュ時に呼ぶ）
 /// </summary>
 public class CameraFollow : MonoBehaviour
 {
@@ -49,6 +50,23 @@ public class CameraFollow : MonoBehaviour
             StopAllCoroutines();
 
         StartCoroutine(ShakeCoroutine());
+    }
+
+    // ==================================================
+    // StopShake: シェイクを強制停止する
+    // ゲームオーバー・フィニッシュのタイミングでシェイク中だった場合に
+    // 揺れっぱなしにならないよう呼ぶ
+    // ==================================================
+    public void StopShake()
+    {
+        if (!_isShaking) return;
+
+        StopAllCoroutines();
+        _isShaking = false;
+
+        // 揺れを止めて通常位置に戻す
+        if (_target != null)
+            transform.position = _target.position + _offset;
     }
 
     // ==================================================

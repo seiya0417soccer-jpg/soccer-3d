@@ -65,16 +65,17 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
 
     // ==================================================
     // IPuzzleField実装：R3のSubjectでイベントを発火する
-    // BattleMainManagerはこのSubjectを購読してバフ・デバフを適用する
+    // 外部にはObservableとして公開し、発火する権利はDropPuzzleBattleだけが持つ
+    // BattleMainManagerはこのObservableを購読してバフ・デバフを適用する
     // ==================================================
     private readonly Subject<int> _onBlocksDestroyed = new Subject<int>();
     private readonly Subject<Unit> _onEKeyBombExploded = new Subject<Unit>();
     private readonly Subject<Unit> _onGameOver = new Subject<Unit>();
 
-    // 外部から購読できるようにプロパティとして公開
-    public Subject<int> OnBlocksDestroyed => _onBlocksDestroyed;
-    public Subject<Unit> OnEKeyBombExploded => _onEKeyBombExploded;
-    public Subject<Unit> OnGameOver => _onGameOver;
+    // 外部からは読み取り専用のObservableとして公開（OnNext()は外部からできない）
+    public Observable<int> OnBlocksDestroyed => _onBlocksDestroyed;
+    public Observable<Unit> OnEKeyBombExploded => _onEKeyBombExploded;
+    public Observable<Unit> OnGameOver => _onGameOver;
 
     // 落下中ピースの状態
     private Vector2Int[] currentShape; // 現在のピース形状（相対座標配列）

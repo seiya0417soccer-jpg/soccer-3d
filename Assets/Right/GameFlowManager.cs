@@ -185,6 +185,15 @@ public class GameFlowManager : MonoBehaviour
     }
 
     // ==================================================
+    // StopYushaCameraShake: 勇者のカメラシェイクを止める
+    // GameOverState・FinishStateから呼ぶ
+    // ==================================================
+    public void StopYushaCameraShake()
+    {
+        _yushaBrain?.StopCameraShake();
+    }
+
+    // ==================================================
     // RestartFromCountdown: もう一度プレイ
     // ResultStateから呼ばれる
     // ==================================================
