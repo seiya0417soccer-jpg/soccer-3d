@@ -16,8 +16,6 @@ using VContainer;
 /// </summary>
 public class BattleMainManager : MonoBehaviour
 {
-    // シングルトン：他スクリプトからBattleMainManager.Instanceでアクセス
-    public static BattleMainManager Instance;
 
     // プランナーが調整できるパラメーターをSOで管理
     [SerializeField] private BattleSettingSO _battleSettingSO;
@@ -54,22 +52,6 @@ public class BattleMainManager : MonoBehaviour
     {
         _yusha = yusha;
         _puzzleField = puzzleField;
-    }
-
-    // ==================================================
-    // Awake: Singleton登録
-    // ==================================================
-    void Awake()
-    {
-        // 既にインスタンスが存在する場合は自分を破棄する（重複防止）
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        // 最初の1つだけ登録する
-        Instance = this;
     }
 
     // ==================================================
