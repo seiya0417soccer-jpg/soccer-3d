@@ -21,7 +21,7 @@ public class ResultState : IGameState
     // ==================================================
     public void Enter()
     {
-        ResultManager.Instance.ShowResult();
+        _gameFlowManager.GetResultManager().ShowResult();
     }
 
     // ==================================================
@@ -48,6 +48,6 @@ public class ResultState : IGameState
     // ==================================================
     public void Exit()
     {
-        ResultManager.Instance.HideResult();
+        _gameFlowManager.GetResultManager().HideResult();
     }
 }

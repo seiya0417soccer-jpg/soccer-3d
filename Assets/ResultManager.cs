@@ -32,9 +32,8 @@ public class ResultManager : MonoBehaviour
     // Inject: VContainer‚©‚çˆË‘¶‚ğ’“ü‚³‚ê‚é
     // ==================================================
     [Inject]
-    public void Construct(ScoreManager scoreManager, GameFlowManager gameFlowManager)
+    public void Construct(ScoreManager scoreManager)
     {
-        // ScoreManager‚ğIScoreReaderEIScoreWriter‚Æ‚µ‚Äó‚¯æ‚é
         _scoreReader = scoreManager;
         _scoreWriter = scoreManager;
     }

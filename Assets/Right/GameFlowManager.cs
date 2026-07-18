@@ -16,8 +16,6 @@ using VContainer;
 /// </summary>
 public class GameFlowManager : MonoBehaviour
 {
-    // シングルトン：他スクリプトからGameFlowManager.Instanceでアクセス
-    public static GameFlowManager Instance;
 
     [Header("Panels")]
     [SerializeField] private GameObject titlePanel;    // タイトル画面
@@ -45,40 +43,36 @@ public class GameFlowManager : MonoBehaviour
     // 現在のゲーム状態（Stateパターン）
     private IGameState _currentState;
 
+    // IScoreWriterを購読する（VContainerで注入される）
+    private IScoreWriter _scoreWriter;
+
+    // ResultManagerを保持する（VContainerで注入される）
+    private ResultManager _resultManager;
+
     // ==================================================
     // Inject: VContainerから依存を注入される
     // ==================================================
     [Inject]
     public void Construct(
-        GameTimer gameTimer,
-        DropPuzzleBattle dropPuzzleBattle,
-        YushaBrain yushaBrain,
-        EnemySpawner enemySpawner,
-        IPuzzleField puzzleField)
+    GameTimer gameTimer,
+    DropPuzzleBattle dropPuzzleBattle,
+    YushaBrain yushaBrain,
+    EnemySpawner enemySpawner,
+    IPuzzleField puzzleField,
+    IScoreWriter scoreWriter,
+    ResultManager resultManager)
     {
         _gameTimer = gameTimer;
         _dropPuzzleBattle = dropPuzzleBattle;
         _yushaBrain = yushaBrain;
         _enemySpawner = enemySpawner;
-
-        // IPuzzleFieldをInjectで受け取る
         _puzzleField = puzzleField;
-    }
 
-    // ==================================================
-    // Awake: シングルトン登録
-    // ==================================================
-    void Awake()
-    {
-        // 既にインスタンスが存在する場合は自分を破棄する（重複防止）
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
+        // IScoreWriterをInjectで受け取る
+        _scoreWriter = scoreWriter;
 
-        // 最初の1つだけ登録する
-        Instance = this;
+        // ResultManagerをInjectで受け取る
+        _resultManager = resultManager;
     }
 
     // ==================================================
@@ -194,6 +188,15 @@ public class GameFlowManager : MonoBehaviour
     }
 
     // ==================================================
+    // GetResultManager: ResultManagerを取得する
+    // ResultStateから呼ぶ（Instance直接参照をやめる）
+    // ==================================================
+    public ResultManager GetResultManager()
+    {
+        return _resultManager;
+    }
+
+    // ==================================================
     // RestartFromCountdown: もう一度プレイ
     // ResultStateから呼ばれる
     // ==================================================
@@ -206,7 +209,7 @@ public class GameFlowManager : MonoBehaviour
         _enemySpawner?.ResetEnemies();
 
         // スコアをリセット
-        ScoreManager.Instance?.ResetScore();
+        _scoreWriter?.ResetScore();
 
         // インゲームUIを再表示
         ShowInGameUI(true);
@@ -228,7 +231,7 @@ public class GameFlowManager : MonoBehaviour
         _enemySpawner?.ResetEnemies();
 
         // スコアをリセット
-        ScoreManager.Instance?.ResetScore();
+        _scoreWriter?.ResetScore();
 
         // インゲームUIを再表示
         ShowInGameUI(true);
