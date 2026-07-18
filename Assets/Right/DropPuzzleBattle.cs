@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using R3;
+using VContainer;
 
 /// <summary>
 /// DropPuzzleBattle.cs
@@ -104,6 +105,17 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
     // CrossBombになるブロックのインデックスセット
     private HashSet<int> crossBombBlockIndices = new HashSet<int>();
 
+
+    // ==================================================
+    // Inject: VContainerから依存を注入される
+    // DropLogicExtensionをFindObjectOfTypeではなくDIで受け取る
+    // ==================================================
+    [Inject]
+    public void Construct(DropLogicExtension dropLogicExtension)
+    {
+        cachedLogic = dropLogicExtension;
+    }
+
     // ==================================================
     // Start: 初期化
     // フィールド・グリッドオブジェクト生成、壁生成、最初のピース生成
@@ -127,9 +139,6 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
                 gridRenderers[y, x] = obj.GetComponent<Renderer>();
             }
         }
-
-        // DropLogicExtensionをキャッシュ（毎フレーム検索しないため）
-        cachedLogic = FindObjectOfType<DropLogicExtension>();
 
         CreateWall(); // フィールド外周の壁を生成
         SpawnPiece(); // 最初のピースを生成

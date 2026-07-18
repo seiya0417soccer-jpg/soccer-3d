@@ -20,5 +20,6 @@ public class GameLifetimeScope : LifetimeScope
         builder.RegisterComponentInHierarchy<EnemySpawner>();
         builder.RegisterComponentInHierarchy<DropPuzzleBattle>().AsSelf().As<IPuzzleField>();
         builder.RegisterComponentInHierarchy<ScoreManager>().AsSelf().As<IScoreWriter>().As<IScoreReader>();
+        builder.RegisterComponentInHierarchy<DropLogicExtension>();
     }
 }
