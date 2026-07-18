@@ -90,6 +90,9 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
     private float offsetX = 100f;
     private float offsetY = 0f;
 
+    // 描画専用クラス（Draw()の責務を分離）
+    private PuzzleRenderer _renderer;
+
     // その他制御フラグ
     private bool skipDestroyedNotification = false; // ブロック消去通知をスキップするフラグ
     private int forcedNextPieceType = -1;           // 次のピース種別を強制指定（-1=通常）
@@ -140,6 +143,9 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
                 gridRenderers[y, x] = obj.GetComponent<Renderer>();
             }
         }
+
+        // PuzzleRendererを初期化（描画に必要な参照を渡す）
+        _renderer = new PuzzleRenderer(gridObjects, gridRenderers, pieceColors);
 
         CreateWall(); // フィールド外周の壁を生成
         SpawnPiece(); // 最初のピースを生成
@@ -552,55 +558,12 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
 
     // ==================================================
     // 描画
-    // フィールドの全マスと落下中ピースをグリッドオブジェクトに反映
+    // PuzzleRendererに処理を委譲する（責務分離）
     // ==================================================
     void Draw()
     {
-        // フィールドの全マスを描画
-        for (int y = 0; y < hight; y++)
-        {
-            for (int x = 0; x < wide; x++)
-            {
-                if (field[y, x] == BlockType.Empty)
-                {
-                    gridObjects[y, x].SetActive(false); // 空マスは非表示
-                }
-                else
-                {
-                    gridObjects[y, x].SetActive(true);
-                    if (field[y, x] == BlockType.CrossBomb)
-                        gridRenderers[y, x].material.color = Color.black;
-                    else if (field[y, x] == BlockType.EKeyBomb)
-                        gridRenderers[y, x].material.color = Color.red;
-                    else if (field[y, x] == BlockType.Piece9)
-                        gridRenderers[y, x].material.color = Color.white;
-                    else
-                        gridRenderers[y, x].material.color = pieceColors[(int)field[y, x] - 1];
-                }
-            }
-        }
-
-        // 落下中ピースを描画（フィールドに固定される前のプレビュー）
-        for (int i = 0; i < currentShape.Length; i++)
-        {
-            Vector2Int p = currentPos + currentShape[i];
-            if (p.y >= 0 && p.y < hight)
-            {
-                gridObjects[p.y, p.x].SetActive(true);
-
-                Color blockColor;
-                if (crossBombBlockIndices.Contains(i))
-                    blockColor = Color.black;
-                else if (currentType == (int)BlockType.EKeyBomb)
-                    blockColor = Color.red;
-                else if (currentType == (int)BlockType.Piece9 - 1)
-                    blockColor = Color.white;
-                else
-                    blockColor = pieceColors[currentType];
-
-                gridRenderers[p.y, p.x].material.color = blockColor;
-            }
-        }
+        _renderer.DrawField(field, hight, wide);
+        _renderer.DrawCurrentPiece(currentPos, currentShape, currentType, crossBombBlockIndices, hight);
     }
 
     // ==================================================
