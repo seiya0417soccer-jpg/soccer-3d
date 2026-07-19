@@ -7,7 +7,7 @@ using R3;
 /// - 実装を差し替えることで別のバトル形式に変更できる
 /// - YushaBrainはこのInterfaceを実装する
 /// - パズル側はこのInterfaceを通してバトル側を知る
-/// - R3のSubjectでイベントを発火する（疎結合）
+/// - R3のObservableでイベントを発火する（疎結合・読み取り専用公開）
 /// </summary>
 public interface IBattleField
 {
@@ -26,6 +26,6 @@ public interface IBattleField
     // デバフ時の発光色を設定する
     void SetDebuffEmission(bool isDebuff);
 
-    // 敵を倒した時に発火するSubject（スコア加算用）
-    Subject<Unit> OnEnemyDefeated { get; }
+    // 敵を倒した時に発火するObservable（スコア加算用）
+    Observable<Unit> OnEnemyDefeated { get; }
 }

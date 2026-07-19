@@ -2,7 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 using VContainer;
-
+using R3;
 /// <summary>
 /// YushaBrain.cs
 /// 勇者のAI制御
@@ -18,7 +18,7 @@ using VContainer;
 /// - バフ量に応じてシアン色に発光・デバフ時に赤く発光する
 /// - YushaSettingSOでパラメーターを管理（プランナーが調整可能）
 /// </summary>
-public class YushaBrain : MonoBehaviour
+public class YushaBrain : MonoBehaviour, IBattleField
 {
     // タグ文字列をハードコードせず定数化（タイプミス防止）
     private const string EnemyTag = "Enemy";
@@ -52,6 +52,15 @@ public class YushaBrain : MonoBehaviour
     private Coroutine _debuffCoroutine;
     private bool _isAttacking = false;    // 攻撃中フラグ（連続攻撃防止）
     private bool _isDebuffActive = false; // デバフ中フラグ（Update処理をスキップする）
+
+    // ==================================================
+    // IBattleField実装：敵を倒した時に発火するSubject
+    // 発火する権利はYushaBrainだけが持ち、外部にはObservableとして公開する
+    // ==================================================
+    private readonly Subject<Unit> _onEnemyDefeated = new Subject<Unit>();
+
+    // 外部からは読み取り専用のObservableとして公開（OnNext()は外部からできない）
+    public Observable<Unit> OnEnemyDefeated => _onEnemyDefeated;
 
     // ==================================================
     // Inject: VContainerから依存を注入される
@@ -134,7 +143,6 @@ public class YushaBrain : MonoBehaviour
             }
         }
     }
-
     // ==================================================
     // 攻撃モーションの頭出し後にDestroyする
     // attackDelay秒待ってから敵を消去してスコア加算
@@ -156,10 +164,22 @@ public class YushaBrain : MonoBehaviour
 
             // 敵を倒した時にカメラを揺らして倒してる感を出す
             _cameraFollow?.ShakeCamera();
+
+            // IBattleField実装：敵を倒したことをSubjectで通知（疎結合）
+            _onEnemyDefeated.OnNext(Unit.Default);
         }
 
         _isAttacking = false;
         _animator?.SetBool(ParamIsMoving, true); // 攻撃後にRunに戻す
+    }
+
+    // ==================================================
+    // OnDestroy: Subjectを破棄する
+    // ==================================================
+    void OnDestroy()
+    {
+        // メモリリーク防止のためSubjectを破棄する
+        _onEnemyDefeated.Dispose();
     }
 
     // ==================================================
