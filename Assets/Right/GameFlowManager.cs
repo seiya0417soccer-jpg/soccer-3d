@@ -80,13 +80,17 @@ public class GameFlowManager : MonoBehaviour
     // ==================================================
     void Start()
     {
-        // IPuzzleField‚ÌƒQ[ƒ€ƒI[ƒo[Subject‚ðw“Ç‚·‚é
+        // IPuzzleField‚ÌƒQ[ƒ€ƒI[ƒo[Observable‚ðw“Ç‚·‚é
+        // AddTo(this)‚ÅGameFlowManager”jŠüŽž‚ÉŽ©“®‚Åw“Ç‰ðœ‚·‚éiƒƒ‚ƒŠƒŠ[ƒN–hŽ~j
         _puzzleField.OnGameOver
-            .Subscribe(_ => ChangeState(new GameOverState(this)));
+            .Subscribe(_ => ChangeState(new GameOverState(this)))
+            .AddTo(this);
 
-        // GameTimer‚ÌŽžŠÔØ‚êSubject‚ðw“Ç‚·‚é
+        // GameTimer‚ÌŽžŠÔØ‚êObservable‚ðw“Ç‚·‚é
+        // AddTo(this)‚ÅGameFlowManager”jŠüŽž‚ÉŽ©“®‚Åw“Ç‰ðœ‚·‚éiƒƒ‚ƒŠƒŠ[ƒN–hŽ~j
         _gameTimer.OnTimeUp
-            .Subscribe(_ => ChangeState(new FinishState(this)));
+            .Subscribe(_ => ChangeState(new FinishState(this)))
+            .AddTo(this);
 
         // ‘Sƒpƒlƒ‹‚ð”ñ•\Ž¦‚É‚µ‚Ä‚©‚çTitleState‚É“ü‚é
         titlePanel.SetActive(false);
