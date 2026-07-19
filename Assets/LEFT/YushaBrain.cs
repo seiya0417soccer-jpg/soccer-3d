@@ -20,18 +20,15 @@ using VContainer;
 /// </summary>
 public class YushaBrain : MonoBehaviour
 {
+    // タグ文字列をハードコードせず定数化（タイプミス防止）
+    private const string EnemyTag = "Enemy";
+
+    // アニメーションパラメーター名の定数化（タイプミス防止）
+    private const string ParamIsMoving = "IsMoving";   // Bool
+    private const string ParamAttack = "IsAttacking";  // Trigger
+
     private NavMeshAgent _agent;
     private Animator _animator;
-
-    // ==================================================
-    // Inject: VContainerから依存を注入される
-    // ==================================================
-    [Inject]
-    public void Construct(IScoreWriter scoreWriter)
-    {
-        // IScoreWriterをInjectで受け取る（ScoreManager.Instance直接参照をやめる）
-        _scoreWriter = scoreWriter;
-    }
 
     // プランナーが調整できるパラメーターをSOで管理
     [SerializeField] private YushaSettingSO _yushaSettingSO;
@@ -52,12 +49,19 @@ public class YushaBrain : MonoBehaviour
     private SkinnedMeshRenderer _meshRenderer;
     private Material _material; // 元のマテリアルを汚さないようにコピーして使う
 
-    private const string ParamIsMoving = "IsMoving";   // Bool
-    private const string ParamAttack = "IsAttacking";  // Trigger
-
     private Coroutine _debuffCoroutine;
-    private bool _isAttacking = false;   // 攻撃中フラグ（連続攻撃防止）
+    private bool _isAttacking = false;    // 攻撃中フラグ（連続攻撃防止）
     private bool _isDebuffActive = false; // デバフ中フラグ（Update処理をスキップする）
+
+    // ==================================================
+    // Inject: VContainerから依存を注入される
+    // ==================================================
+    [Inject]
+    public void Construct(IScoreWriter scoreWriter)
+    {
+        // IScoreWriterをInjectで受け取る（ScoreManager.Instance直接参照をやめる）
+        _scoreWriter = scoreWriter;
+    }
 
     // ==================================================
     // Start: 初期化
@@ -163,7 +167,7 @@ public class YushaBrain : MonoBehaviour
     // ==================================================
     GameObject GetNearestEnemy()
     {
-        GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
+        GameObject[] enemies = GameObject.FindGameObjectsWithTag(EnemyTag);
         GameObject nearest = null;
         float minDist = float.MaxValue;
 
