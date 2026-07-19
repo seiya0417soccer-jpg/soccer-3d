@@ -1,36 +1,38 @@
 using UnityEngine;
 
 /// <summary>
-/// DropLogicExtension.cs 完全版
-/// - 設計書ルール（家系図・引数経由・直接変数操作禁止）厳守
-/// - Eキー爆弾予約フロー完全版
+/// DropLogicExtension.cs
+/// EKeyBomb（爆弾）発動の拡張ロジック
+/// 
+/// - Eキー押下で次のピースをEKeyBombに変更予約する
+/// - DropPuzzleBattleに破壊通知スキップを指示する
 /// </summary>
 public class DropLogicExtension : MonoBehaviour
 {
     [Header("References")]
-    // DropPuzzleBattle の参照（ブロック管理用）
-    [SerializeField] private DropPuzzleBattle dropPuzzle;
+    // DropPuzzleBattleの参照（ブロック管理用）
+    [SerializeField] private DropPuzzleBattle _dropPuzzle;
 
     [Header("E-Key Bomb Settings")]
     // Eキーで出す爆弾のタイプ番号
-    [SerializeField] private int eKeyBombType = 11;
+    [SerializeField] private int _eKeyBombType = 11;
 
     // Eキーの入力キー
-    [SerializeField] private KeyCode eKey = KeyCode.E;
+    [SerializeField] private KeyCode _eKey = KeyCode.E;
 
     // 次に生成するピースがE爆弾かどうかのフラグ
-    private bool nextPieceIsEKeyBomb = false;
+    private bool _nextPieceIsEKeyBomb = false;
 
     // 爆弾予約中フラグ（連打防止用）
-    private bool eBombPending = false;
+    private bool _eBombPending = false;
 
     // ==================================================
-    // 毎フレーム更新
+    // Update: 毎フレーム更新
     // ==================================================
     void Update()
     {
         // Eキー押下で爆弾予約
-        if (Input.GetKeyDown(eKey))
+        if (Input.GetKeyDown(_eKey))
         {
             OnEKeyPressed(); // Eキー押下時処理
         }
@@ -44,15 +46,15 @@ public class DropLogicExtension : MonoBehaviour
     void OnEKeyPressed()
     {
         // すでに爆弾予約中なら無視
-        if (eBombPending)
+        if (_eBombPending)
             return;
 
-        eBombPending = true;             // 爆弾予約中フラグON
-        nextPieceIsEKeyBomb = true;      // 次ピースをE爆弾にする
+        _eBombPending = true;             // 爆弾予約中フラグON
+        _nextPieceIsEKeyBomb = true;      // 次ピースをE爆弾にする
 
         // DropPuzzleBattleに破壊通知スキップを指示
-        if (dropPuzzle != null)
-            dropPuzzle.SetSkipDestroyedNotification(true);
+        if (_dropPuzzle != null)
+            _dropPuzzle.SetSkipDestroyedNotification(true);
     }
 
     // ==================================================
@@ -61,10 +63,10 @@ public class DropLogicExtension : MonoBehaviour
     // ==================================================
     public int GetNextPieceType(int defaultType)
     {
-        if (nextPieceIsEKeyBomb)
+        if (_nextPieceIsEKeyBomb)
         {
-            nextPieceIsEKeyBomb = false;
-            return eKeyBombType;
+            _nextPieceIsEKeyBomb = false;
+            return _eKeyBombType;
         }
         return defaultType;
     }
@@ -76,10 +78,10 @@ public class DropLogicExtension : MonoBehaviour
     // ==================================================
     public void OnEKeyBombFinished()
     {
-        eBombPending = false;             // 予約中フラグOFF
+        _eBombPending = false;             // 予約中フラグOFF
 
         // DropPuzzleBattle側の通知スキップ解除
-        if (dropPuzzle != null)
-            dropPuzzle.SetSkipDestroyedNotification(false);
+        if (_dropPuzzle != null)
+            _dropPuzzle.SetSkipDestroyedNotification(false);
     }
 }
