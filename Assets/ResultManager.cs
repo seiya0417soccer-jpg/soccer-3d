@@ -9,12 +9,10 @@ using VContainer;
 /// - 自己ベストをPlayerPrefsで保存・表示
 /// - キー入力はResultStateで管理する（Stateパターンに移管）
 /// - IScoreReaderでスコア読み取り・IScoreWriterでリセット
+/// - VContainerのInjectのみで依存解決（Singleton削除済み）
 /// </summary>
 public class ResultManager : MonoBehaviour
 {
-    // シングルトン：他スクリプトからResultManager.Instanceでアクセス
-    public static ResultManager Instance;
-
     [SerializeField] private GameObject resultPanel;
 
     // TMPコンポーネントをキャッシュしておく（毎フレームGetComponentしない）
@@ -36,22 +34,6 @@ public class ResultManager : MonoBehaviour
     {
         _scoreReader = scoreManager;
         _scoreWriter = scoreManager;
-    }
-
-    // ==================================================
-    // Awake: Singleton登録
-    // ==================================================
-    void Awake()
-    {
-        // 既にインスタンスが存在する場合は自分を破棄する（重複防止）
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        // 最初の1つだけ登録する
-        Instance = this;
     }
 
     // ==================================================
