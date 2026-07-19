@@ -16,20 +16,19 @@ using VContainer;
 /// </summary>
 public class GameFlowManager : MonoBehaviour
 {
-
     [Header("Panels")]
-    [SerializeField] private GameObject titlePanel;    // タイトル画面
-    [SerializeField] private GameObject manualPanel;   // 操作説明画面
-    [SerializeField] private GameObject readyGoGroup;  // カウントダウン画面
-    [SerializeField] private GameObject gameOverPanel; // ゲームオーバー画面
-    [SerializeField] private GameObject finishPanel;   // フィニッシュ画面
+    [SerializeField] private GameObject _titlePanel;    // タイトル画面
+    [SerializeField] private GameObject _manualPanel;   // 操作説明画面
+    [SerializeField] private GameObject _readyGoGroup;  // カウントダウン画面
+    [SerializeField] private GameObject _gameOverPanel; // ゲームオーバー画面
+    [SerializeField] private GameObject _finishPanel;   // フィニッシュ画面
 
     [Header("ReadyGo")]
-    [SerializeField] private TextMeshProUGUI countdownText; // 3,2,1,GO!を表示するTMPテキスト
+    [SerializeField] private TextMeshProUGUI _countdownText; // 3,2,1,GO!を表示するTMPテキスト
 
     [Header("UI")]
-    [SerializeField] private GameObject killCountObject;  // キルカウント表示（終了時に非表示）
-    [SerializeField] private GameObject timerTextObject;  // タイマー表示（終了時に非表示）
+    [SerializeField] private GameObject _killCountObject;  // キルカウント表示（終了時に非表示）
+    [SerializeField] private GameObject _timerTextObject;  // タイマー表示（終了時に非表示）
 
     // VContainerでDI注入される依存クラス
     private GameTimer _gameTimer;
@@ -54,13 +53,13 @@ public class GameFlowManager : MonoBehaviour
     // ==================================================
     [Inject]
     public void Construct(
-    GameTimer gameTimer,
-    DropPuzzleBattle dropPuzzleBattle,
-    YushaBrain yushaBrain,
-    EnemySpawner enemySpawner,
-    IPuzzleField puzzleField,
-    IScoreWriter scoreWriter,
-    ResultManager resultManager)
+        GameTimer gameTimer,
+        DropPuzzleBattle dropPuzzleBattle,
+        YushaBrain yushaBrain,
+        EnemySpawner enemySpawner,
+        IPuzzleField puzzleField,
+        IScoreWriter scoreWriter,
+        ResultManager resultManager)
     {
         _gameTimer = gameTimer;
         _dropPuzzleBattle = dropPuzzleBattle;
@@ -93,11 +92,11 @@ public class GameFlowManager : MonoBehaviour
             .AddTo(this);
 
         // 全パネルを非表示にしてからTitleStateに入る
-        titlePanel.SetActive(false);
-        manualPanel.SetActive(false);
-        readyGoGroup.SetActive(false);
-        gameOverPanel.SetActive(false);
-        finishPanel.SetActive(false);
+        _titlePanel.SetActive(false);
+        _manualPanel.SetActive(false);
+        _readyGoGroup.SetActive(false);
+        _gameOverPanel.SetActive(false);
+        _finishPanel.SetActive(false);
 
         // 最初の状態はタイトル画面
         ChangeState(new TitleState(this));
@@ -130,17 +129,17 @@ public class GameFlowManager : MonoBehaviour
     // パネル表示切替メソッド群
     // 各StateクラスのEnter・Exitから呼ばれる
     // ==================================================
-    public void ShowTitlePanel(bool show) => titlePanel.SetActive(show);
-    public void ShowManualPanel(bool show) => manualPanel.SetActive(show);
-    public void ShowReadyGoPanel(bool show) => readyGoGroup.SetActive(show);
-    public void ShowGameOverPanel(bool show) => gameOverPanel.SetActive(show);
-    public void ShowFinishPanel(bool show) => finishPanel.SetActive(show);
+    public void ShowTitlePanel(bool show) => _titlePanel.SetActive(show);
+    public void ShowManualPanel(bool show) => _manualPanel.SetActive(show);
+    public void ShowReadyGoPanel(bool show) => _readyGoGroup.SetActive(show);
+    public void ShowGameOverPanel(bool show) => _gameOverPanel.SetActive(show);
+    public void ShowFinishPanel(bool show) => _finishPanel.SetActive(show);
 
     // キルカウント・タイマーの表示切替
     public void ShowInGameUI(bool show)
     {
-        killCountObject?.SetActive(show);
-        timerTextObject?.SetActive(show);
+        _killCountObject?.SetActive(show);
+        _timerTextObject?.SetActive(show);
     }
 
     // ==================================================
@@ -160,13 +159,13 @@ public class GameFlowManager : MonoBehaviour
     {
         Time.timeScale = 0f; // カウントダウン中は止める
 
-        countdownText.text = "3";
+        _countdownText.text = "3";
         yield return new WaitForSecondsRealtime(1f);
-        countdownText.text = "2";
+        _countdownText.text = "2";
         yield return new WaitForSecondsRealtime(1f);
-        countdownText.text = "1";
+        _countdownText.text = "1";
         yield return new WaitForSecondsRealtime(1f);
-        countdownText.text = "GO!";
+        _countdownText.text = "GO!";
         yield return new WaitForSecondsRealtime(0.8f);
 
         // カウントダウン完了→PlayingStateへ遷移
