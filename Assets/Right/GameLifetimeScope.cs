@@ -5,21 +5,22 @@ using VContainer.Unity;
 /// GameLifetimeScope.cs
 /// VContainerのDIコンテナ設定
 /// 
-/// - このクラスでどのクラスをDIするかを定義する
-/// - RegisterはC#クラス、RegisterComponentはMonoBehaviourに使う
+/// - CoreInstaller・PuzzleInstaller・BattleInstallerに
+///   責務を分割して登録する
+/// - 「どこに何が登録されているか」を一目でわかるようにした
+/// - VContainer標準のIInstallerを使い、RegisterInstallerで登録する
 /// </summary>
 public class GameLifetimeScope : LifetimeScope
 {
     protected override void Configure(IContainerBuilder builder)
     {
-        builder.RegisterComponentInHierarchy<GameFlowManager>();
-        builder.RegisterComponentInHierarchy<BattleMainManager>();
-        builder.RegisterComponentInHierarchy<ResultManager>();
-        builder.RegisterComponentInHierarchy<GameTimer>();
-        builder.RegisterComponentInHierarchy<YushaBrain>();
-        builder.RegisterComponentInHierarchy<EnemySpawner>();
-        builder.RegisterComponentInHierarchy<DropPuzzleBattle>().AsSelf().As<IPuzzleField>();
-        builder.RegisterComponentInHierarchy<ScoreManager>().AsSelf().As<IScoreWriter>().As<IScoreReader>();
-        builder.RegisterComponentInHierarchy<DropLogicExtension>();
+        // 全体管理系（GameFlowManager・ScoreManager・ResultManager）
+        new CoreInstaller().Install(builder);
+
+        // パズル画面関連（DropPuzzleBattle・DropLogicExtension）
+        new PuzzleInstaller().Install(builder);
+
+        // バトル画面関連（YushaBrain・BattleMainManager・EnemySpawner・GameTimer）
+        new BattleInstaller().Install(builder);
     }
 }
