@@ -191,6 +191,15 @@ public class GameFlowManager : MonoBehaviour
     }
 
     // ==================================================
+    // EnableYushaCameraShake: 勇者のカメラシェイク禁止を解除する
+    // RestartFromCountdown・GoToTitleから呼ぶ
+    // ==================================================
+    public void EnableYushaCameraShake()
+    {
+        _yushaBrain?.EnableCameraShake();
+    }
+
+    // ==================================================
     // GetResultManager: ResultManagerを取得する
     // ResultStateから呼ぶ（Instance直接参照をやめる）
     // ==================================================
@@ -210,6 +219,9 @@ public class GameFlowManager : MonoBehaviour
         _gameTimer?.ResetTimer();
         _yushaBrain?.ResetPosition();
         _enemySpawner?.ResetEnemies();
+
+        // カメラシェイクの禁止を解除する（前回ゲームオーバーで禁止されている場合があるため）
+        EnableYushaCameraShake();
 
         // スコアをリセット
         _scoreWriter?.ResetScore();
@@ -232,6 +244,9 @@ public class GameFlowManager : MonoBehaviour
         _gameTimer?.ResetTimer();
         _yushaBrain?.ResetPosition();
         _enemySpawner?.ResetEnemies();
+
+        // カメラシェイクの禁止を解除する（前回ゲームオーバーで禁止されている場合があるため）
+        EnableYushaCameraShake();
 
         // スコアをリセット
         _scoreWriter?.ResetScore();

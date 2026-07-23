@@ -302,4 +302,13 @@ public class YushaBrain : MonoBehaviour, IBattleField
     {
         _cameraFollow?.StopShake();
     }
+
+    // ==================================================
+    // カメラシェイクの禁止を解除する
+    // GameFlowManagerのRestartFromCountdown・GoToTitleから呼ぶ
+    // ==================================================
+    public void EnableCameraShake()
+    {
+        _cameraFollow?.EnableShake();
+    }
 }

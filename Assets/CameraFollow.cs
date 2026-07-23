@@ -7,7 +7,9 @@ using UnityEngine;
 /// 
 /// - 勇者の位置にオフセットを加えてカメラを追従させる
 /// - ShakeCamera()で画面揺れを発生させる（敵を倒した時などに呼ぶ）
-/// - StopShake()でシェイクを強制停止する（ゲームオーバー・フィニッシュ時に呼ぶ）
+/// - StopShake()でシェイクを強制停止し、以降のシェイクも禁止する
+///   （ゲームオーバー・フィニッシュ時に呼ぶ）
+/// - EnableShake()で禁止を解除する（もう一度プレイ・タイトル復帰時に呼ぶ）
 /// </summary>
 public class CameraFollow : MonoBehaviour
 {
@@ -23,6 +25,11 @@ public class CameraFollow : MonoBehaviour
 
     // シェイク中フラグ
     private bool _isShaking = false;
+
+    // シェイクを禁止するフラグ（ゲームオーバー・フィニッシュ中はtrueにする）
+    // 敵を倒した直後にゲームオーバーになった場合、
+    // シェイクが後から発動して揺れっぱなしになるのを防ぐ
+    private bool _shakeDisabled = false;
 
     // ==================================================
     // LateUpdate: 毎フレーム勇者を追いかける
@@ -42,9 +49,12 @@ public class CameraFollow : MonoBehaviour
     // ==================================================
     // ShakeCamera: カメラを揺らす
     // 敵を倒した時にYushaBrainから呼ぶ
+    // シェイク禁止中（ゲームオーバー・フィニッシュ中）は何もしない
     // ==================================================
     public void ShakeCamera()
     {
+        if (_shakeDisabled) return;
+
         // 既にシェイク中なら一旦止めて再度シェイク
         if (_isShaking)
             StopAllCoroutines();
@@ -53,12 +63,14 @@ public class CameraFollow : MonoBehaviour
     }
 
     // ==================================================
-    // StopShake: シェイクを強制停止する
-    // ゲームオーバー・フィニッシュのタイミングでシェイク中だった場合に
-    // 揺れっぱなしにならないよう呼ぶ
+    // StopShake: シェイクを強制停止し、以降のシェイクも禁止する
+    // ゲームオーバー・フィニッシュのタイミングで呼ぶ
     // ==================================================
     public void StopShake()
     {
+        // 以降のShakeCamera()呼び出しを無視するようにする
+        _shakeDisabled = true;
+
         if (!_isShaking) return;
 
         StopAllCoroutines();
@@ -67,6 +79,15 @@ public class CameraFollow : MonoBehaviour
         // 揺れを止めて通常位置に戻す
         if (_target != null)
             transform.position = _target.position + _offset;
+    }
+
+    // ==================================================
+    // EnableShake: シェイク禁止を解除する
+    // もう一度プレイ・タイトル復帰時に呼ぶ
+    // ==================================================
+    public void EnableShake()
+    {
+        _shakeDisabled = false;
     }
 
     // ==================================================
