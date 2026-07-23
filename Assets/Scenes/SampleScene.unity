@@ -1781,14 +1781,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b532dc9124558c24385b60365471fd23, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  titlePanel: {fileID: 77190946}
-  manualPanel: {fileID: 1980403517}
-  readyGoGroup: {fileID: 1892640826}
-  gameOverPanel: {fileID: 53445699}
-  finishPanel: {fileID: 78375959}
-  countdownText: {fileID: 822125706}
-  killCountObject: {fileID: 1885058801}
-  timerTextObject: {fileID: 1257889909}
+  _titlePanel: {fileID: 77190946}
+  _manualPanel: {fileID: 1980403517}
+  _readyGoGroup: {fileID: 1892640826}
+  _gameOverPanel: {fileID: 53445699}
+  _finishPanel: {fileID: 78375959}
+  _countdownText: {fileID: 822125706}
+  _killCountObject: {fileID: 1885058801}
+  _timerTextObject: {fileID: 1257889909}
 --- !u!4 &885499101
 Transform:
   m_ObjectHideFlags: 0
@@ -3105,9 +3105,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bc06654420c2a93449f91199311b01a3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dropPuzzle: {fileID: 1257438898}
-  eKeyBombType: 11
-  eKey: 101
+  _dropPuzzle: {fileID: 0}
+  _eKeyBombType: 11
+  _eKey: 101
 --- !u!1 &1257889909
 GameObject:
   m_ObjectHideFlags: 0
