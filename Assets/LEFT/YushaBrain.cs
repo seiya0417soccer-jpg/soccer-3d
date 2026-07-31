@@ -63,6 +63,15 @@ public class YushaBrain : MonoBehaviour, IBattleField
     public Observable<Unit> OnEnemyDefeated => _onEnemyDefeated;
 
     // ==================================================
+    // デバフ終了時に発火するSubject
+    // 発火する権利はYushaBrainだけが持ち、外部にはObservableとして公開する
+    // ==================================================
+    private readonly Subject<Unit> _onDebuffFinished = new Subject<Unit>();
+
+    // 外部からは読み取り専用のObservableとして公開（OnNext()は外部からできない）
+    public Observable<Unit> OnDebuffFinished => _onDebuffFinished;
+
+    // ==================================================
     // Inject: VContainerから依存を注入される
     // ==================================================
     [Inject]
@@ -180,6 +189,7 @@ public class YushaBrain : MonoBehaviour, IBattleField
     {
         // メモリリーク防止のためSubjectを破棄する
         _onEnemyDefeated.Dispose();
+        _onDebuffFinished.Dispose();
     }
 
     // ==================================================
@@ -209,6 +219,7 @@ public class YushaBrain : MonoBehaviour, IBattleField
     // ==================================================
     public void UpdateSpeed(float bonusSpeed)
     {
+        if (_isDebuffActive) return; // デバフ中は自分の判断で無視する
         _agent.speed = Mathf.Max(0f, _yushaSettingSO.DefaultSpeed + bonusSpeed);
     }
 
@@ -256,20 +267,27 @@ public class YushaBrain : MonoBehaviour, IBattleField
     // ==================================================
     // デバフCoroutine
     // デバフ中フラグをtrueにしてUpdateをスキップさせる
-    // デバフ終了後にフラグをfalseに戻す
+    // デバフ終了後にBattleMainManagerへ通知して
+    // 現在有効なバフ量を再反映してもらう
     // ==================================================
     private IEnumerator DebuffCoroutine(float duration)
     {
-        float originalSpeed = _agent.speed;
-        _agent.speed = 0f;
+        // デバフ開始
         _isDebuffActive = true;                        // デバフ開始・Updateをスキップ
+        _agent.speed = 0f;                             // 勇者を停止
         _animator?.SetBool(ParamIsMoving, false);      // 足踏みアニメーションを止める
         SetDebuffEmission(true);                       // デバフ中は赤く光る
+
         yield return new WaitForSeconds(duration);
-        _agent.speed = originalSpeed;
+
+        // デバフ終了
         _isDebuffActive = false;                       // デバフ終了・Updateを再開
         SetDebuffEmission(false);                      // デバフ解除後は発光なしに戻す
         _debuffCoroutine = null;
+
+        // デバフ終了を通知する
+        // BattleMainManagerが現在のバフ量を再計算して速度を反映する
+        _onDebuffFinished.OnNext(Unit.Default);
     }
 
     // ==================================================
