@@ -227,10 +227,12 @@ public class YushaBrain : MonoBehaviour, IBattleField
     // 発光強度を設定する
     // BattleMainManagerからバフ量に応じて呼ぶ
     // intensityが0なら発光なし・大きいほど強く光る
+    // デバフ中はバフの発光で上書きしない
     // ==================================================
     public void SetEmission(float intensity)
     {
         if (_material == null) return;
+        if (_isDebuffActive) return; // デバフ中はバフの発光で上書きしない
 
         // バフ時はシアン色で発光
         Color emissionColor = Color.cyan * intensity;

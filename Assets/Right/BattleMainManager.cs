@@ -29,10 +29,6 @@ public class BattleMainManager : MonoBehaviour
     // 現在有効なバフエントリのリスト
     private List<BuffEntry> _activeBuffs = new List<BuffEntry>();
 
-    // デバフ中フラグ
-    private bool _isEKeyDebuffActive = false;
-    private Coroutine _eKeyDebuffCoroutine;
-
     // バフの総量（activeBuffsから都度計算）
     private float TotalBonusSpeed
     {
@@ -70,7 +66,13 @@ public class BattleMainManager : MonoBehaviour
             .AddTo(this);
 
         _puzzleField.OnEKeyBombExploded
-            .Subscribe(_ => ApplyEKeyDebuff(_battleSettingSO.EKeyDebuffDuration))
+            .Subscribe(_ => _yusha?.ApplyEKeyDebuff(_battleSettingSO.EKeyDebuffDuration))
+            .AddTo(this);
+
+        // デバフ終了通知を購読し、現在のバフ量を再適用する
+        // （速度を決める責任をBattleMainManagerに一本化する前提条件）
+        _yusha.OnDebuffFinished
+            .Subscribe(_ => ApplySpeed())
             .AddTo(this);
     }
 
@@ -96,39 +98,12 @@ public class BattleMainManager : MonoBehaviour
     }
 
     // ==================================================
-    // Eキー爆弾デバフ（一定時間停止）
-    // ==================================================
-    public void ApplyEKeyDebuff(float duration)
-    {
-        if (_eKeyDebuffCoroutine != null)
-            StopCoroutine(_eKeyDebuffCoroutine);
-
-        // YushaBrainのデバフも同時に適用する
-        _yusha?.ApplyEKeyDebuff(_battleSettingSO.EKeyDebuffDuration);
-
-        _eKeyDebuffCoroutine = StartCoroutine(EKeyDebuffCoroutine(_battleSettingSO.EKeyDebuffDuration));
-    }
-
-    IEnumerator EKeyDebuffCoroutine(float duration)
-    {
-        if (_yusha == null) yield break;
-
-        _isEKeyDebuffActive = true;
-        _yusha.UpdateSpeed(-_yusha.DefaultSpeed); // 勇者を停止
-        yield return new WaitForSeconds(duration);
-        _isEKeyDebuffActive = false;
-        _eKeyDebuffCoroutine = null;
-        ApplySpeed(); // デバフ解除後、現在のバフ量を反映
-    }
-
-    // ==================================================
     // 現在のバフ量を勇者に反映
-    // デバフ中は無視（デバフ解除時にApplySpeedが呼ばれる）
+    // デバフ中かどうかの判断はYushaBrain.UpdateSpeed()内で行う
     // ==================================================
     void ApplySpeed()
     {
         if (_yusha == null) return;
-        if (_isEKeyDebuffActive) return; // デバフ中はバフを反映しない
 
         float bonusSpeed = TotalBonusSpeed;
         _yusha.UpdateSpeed(bonusSpeed);
