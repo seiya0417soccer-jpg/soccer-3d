@@ -111,14 +111,11 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
 
 
     // ==================================================
-    // Inject: VContainerから依存を注入される
-    // DropLogicExtensionをFindObjectOfTypeではなくDIで受け取る
+    // Inject を削除（DropLogicExtension との循環依存を解消するため）
+    // DropPuzzleBattle → DropLogicExtension を Inject すると
+    // DropLogicExtension → DropPuzzleBattle を Inject と循環してしまう
+    // そのため DropLogicExtension の取得は Start() で行う
     // ==================================================
-    [Inject]
-    public void Construct(DropLogicExtension dropLogicExtension)
-    {
-        cachedLogic = dropLogicExtension;
-    }
 
     // ==================================================
     // Start: 初期化
@@ -126,6 +123,10 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
     // ==================================================
     void Start()
     {
+        // DropLogicExtensionを同じGameObjectから取得する
+        // Injectではなくここで取得することで循環依存を回避する
+        cachedLogic = GetComponent<DropLogicExtension>();
+
         // フィールド配列を初期化
         field = new BlockType[hight, wide];
         gridObjects = new GameObject[hight, wide];
