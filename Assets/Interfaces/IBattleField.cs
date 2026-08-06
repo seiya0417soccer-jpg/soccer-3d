@@ -8,24 +8,24 @@ using R3;
 /// - YushaBrainはこのInterfaceを実装する
 /// - パズル側はこのInterfaceを通してバトル側を知る
 /// - R3のObservableでイベントを発火する（疎結合・読み取り専用公開）
+/// - OnDebuffFinishedを追加することでBattleMainManagerが
+///   YushaBrain具体型を知らなくてもデバフ終了を検知できる
 /// </summary>
 public interface IBattleField
 {
     // 初期位置にリセットする
     void ResetPosition();
-
     // 速度バフを適用する
     void UpdateSpeed(float bonusSpeed);
-
     // Eキーデバフを適用する
     void ApplyEKeyDebuff(float duration);
-
     // 発光強度を設定する（バフ時）
     void SetEmission(float intensity);
-
     // デバフ時の発光色を設定する
     void SetDebuffEmission(bool isDebuff);
-
-    // 敵を倒した時に発火するObservable（スコア加算用）
+    // 敵を倒した時に発火するObservable
     Observable<Unit> OnEnemyDefeated { get; }
+    // デバフ終了時に発火するObservable
+    // BattleMainManagerがバフ量を再適用するために購読する
+    Observable<Unit> OnDebuffFinished { get; }
 }
