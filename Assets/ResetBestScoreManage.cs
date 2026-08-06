@@ -5,55 +5,62 @@ using UnityEngine.UI;
 /// ResetBestScoreManager.cs
 /// タイトル画面のベストスコアリセット機能
 /// 
-/// - リセットボタン押下で確認パネルを表示
+/// - リセットボタン押下で確認パネルを表示する（誤操作防止のため2段階確認にした）
 /// - DeleteButton → PlayerPrefsのベストスコアを削除して確認パネルを閉じる
-/// - IIEButton → 確認パネルを閉じるだけ
+/// - IIEButton → 確認パネルを閉じるだけ（削除しない）
+/// - BestScoreKeyはGameConstantsで一本管理する
+///   （ResultManagerと同じキーを使うため定数の重複を防ぐ）
 /// </summary>
 public class ResetBestScoreManager : MonoBehaviour
 {
-    [SerializeField] private GameObject checkPanel;            // 確認パネル
-    [SerializeField] private Button bestScoreResetButton;  // リセットボタン
-    [SerializeField] private Button deleteButton;          // 削除確認ボタン（はい）
-    [SerializeField] private Button iieButton;             // キャンセルボタン（いいえ）
-
-    private const string BestScoreKey = "BestScore"; // PlayerPrefsのキー（ResultManagerと同じ）
+    [SerializeField] private GameObject _checkPanel;           // 確認パネル
+    [SerializeField] private Button _bestScoreResetButton;     // リセットボタン
+    [SerializeField] private Button _deleteButton;             // 削除確認ボタン（はい）
+    [SerializeField] private Button _iieButton;                // キャンセルボタン（いいえ）
 
     // ==================================================
-    // Start: ボタンにイベントを登録
+    // Start: ボタンにイベントを登録する
+    // AddListenerで登録することでInspectorに依存せず
+    // コードで管理できる（引き継ぎやすさの向上）
     // ==================================================
     void Start()
     {
-        checkPanel.SetActive(false); // 確認パネルは最初非表示
+        // 確認パネルは最初非表示にする（リセットボタン押下で表示）
+        _checkPanel.SetActive(false);
 
-        bestScoreResetButton.onClick.AddListener(OnResetButtonClicked);
-        deleteButton.onClick.AddListener(OnDeleteClicked);
-        iieButton.onClick.AddListener(OnIIEClicked);
+        _bestScoreResetButton.onClick.AddListener(OnResetButtonClicked);
+        _deleteButton.onClick.AddListener(OnDeleteClicked);
+        _iieButton.onClick.AddListener(OnIIEClicked);
     }
 
     // ==================================================
-    // リセットボタン押下：確認パネルを表示
+    // OnResetButtonClicked: リセットボタン押下
+    // 誤操作防止のため確認パネルを表示する
     // ==================================================
     void OnResetButtonClicked()
     {
-        checkPanel.SetActive(true);
+        _checkPanel.SetActive(true);
     }
 
     // ==================================================
-    // DeleteButton：ベストスコアを削除して確認パネルを閉じる
+    // OnDeleteClicked: 削除確認ボタン（はい）押下
+    // GameConstantsのキーでPlayerPrefsからベストスコアを削除する
     // ==================================================
     void OnDeleteClicked()
     {
-        PlayerPrefs.DeleteKey(BestScoreKey);
+        // GameConstants.BestScoreKeyで一本管理（ResultManagerと同じキーを使う）
+        PlayerPrefs.DeleteKey(GameConstants.BestScoreKey);
         PlayerPrefs.Save();
-        checkPanel.SetActive(false);
+        _checkPanel.SetActive(false);
         Debug.Log("ベストスコアをリセットしました");
     }
 
     // ==================================================
-    // IIEButton：確認パネルを閉じるだけ
+    // OnIIEClicked: キャンセルボタン（いいえ）押下
+    // 確認パネルを閉じるだけで削除はしない
     // ==================================================
     void OnIIEClicked()
     {
-        checkPanel.SetActive(false);
+        _checkPanel.SetActive(false);
     }
 }

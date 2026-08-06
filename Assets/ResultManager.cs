@@ -5,54 +5,56 @@ using VContainer;
 /// <summary>
 /// ResultManager.cs
 /// リザルト画面の表示・操作管理
-/// - 今回のキル数表示
-/// - 自己ベストをPlayerPrefsで保存・表示
-/// - キー入力はResultStateで管理する（Stateパターンに移管）
-/// - IScoreReaderでスコア読み取り・IScoreWriterでリセット
-/// - VContainerのInjectのみで依存解決（Singleton削除済み）
+/// 
+/// - 今回のキル数と自己ベストスコアを表示する
+/// - 自己ベストはPlayerPrefsで端末に保存する
+/// - キー入力はResultStateで管理する（Stateパターンに責務を移管）
+/// - IScoreReaderでスコード読み取り・書き換えは一切できない設計にした
+/// - BestScoreKeyはGameConstantsで一本管理する
+///   （ResetBestScoreManagerと同じキーを使うため定数の重複を防ぐ）
+/// - VContainerのInjectのみで依存解決する（Singleton不使用）
 /// </summary>
 public class ResultManager : MonoBehaviour
 {
-    [SerializeField] private GameObject resultPanel;
+    [SerializeField] private GameObject _resultPanel;
 
     // TMPコンポーネントをキャッシュしておく（毎フレームGetComponentしない）
     [SerializeField] private TextMeshProUGUI _bestScoreText;
     [SerializeField] private TextMeshProUGUI _nowScoreText;
 
-    // PlayerPrefsのキー定数
-    private const string BestScoreKey = "BestScore";
-
-    // IScoreReaderで読み取り・IScoreWriterでリセット（ScoreManager直接参照をやめる）
+    // IScoreReaderで読み取りのみ（ScoreManager直接参照をやめる）
+    // Interfaceで受け取ることで、将来ScoreManagerを差し替えても影響を受けない
     private IScoreReader _scoreReader;
-    private IScoreWriter _scoreWriter;
 
     // ==================================================
     // Inject: VContainerから依存を注入される
+    // ScoreManagerをIScoreReaderとして受け取る
+    // 読み取りしか必要ないためIScoreReaderのみ注入する
     // ==================================================
     [Inject]
-    public void Construct(ScoreManager scoreManager)
+    public void Construct(IScoreReader scoreReader)
     {
-        _scoreReader = scoreManager;
-        _scoreWriter = scoreManager;
+        _scoreReader = scoreReader;
     }
 
     // ==================================================
-    // リザルト表示
+    // ShowResult: リザルト画面を表示する
     // ResultStateのEnterから呼ぶ
     // ==================================================
     public void ShowResult()
     {
-        resultPanel.SetActive(true);
+        _resultPanel.SetActive(true);
 
         // IScoreReaderを通してスコアを読み取る（書き換え不可）
         int currentScore = _scoreReader.Score;
 
-        // 自己ベスト更新
-        int bestScore = PlayerPrefs.GetInt(BestScoreKey, 0);
+        // 自己ベストをPlayerPrefsから取得して更新する
+        int bestScore = PlayerPrefs.GetInt(GameConstants.BestScoreKey, 0);
         if (currentScore > bestScore)
         {
             bestScore = currentScore;
-            PlayerPrefs.SetInt(BestScoreKey, bestScore);
+            // 更新があった場合のみPlayerPrefsに書き込む（無駄な書き込みを避ける）
+            PlayerPrefs.SetInt(GameConstants.BestScoreKey, bestScore);
             PlayerPrefs.Save();
         }
 
@@ -61,21 +63,11 @@ public class ResultManager : MonoBehaviour
     }
 
     // ==================================================
-    // リザルト非表示
+    // HideResult: リザルト画面を非表示にする
     // ResultStateのExitから呼ぶ
     // ==================================================
     public void HideResult()
     {
-        resultPanel.SetActive(false);
-    }
-
-    // ==================================================
-    // スコアリセット
-    // RestartFromCountdown・GoToTitleから呼ぶ
-    // ==================================================
-    public void ResetScore()
-    {
-        // IScoreWriterを通してリセット（直接書き換え不可）
-        _scoreWriter.ResetScore();
+        _resultPanel.SetActive(false);
     }
 }
