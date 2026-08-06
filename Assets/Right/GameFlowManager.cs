@@ -8,7 +8,15 @@ using VContainer;
 /// GameFlowManager.cs
 /// ゲーム全体のフロー管理
 /// 
-/// Stateパターンで状態を管理する
+/// - Stateパターンで状態を管理する
+///   各状態クラスがEnter・Update・Exitを持ち、GameFlowManagerは
+///   状態の切り替えだけを担当する（状態ごとの処理を分離）
+/// - 依存クラスはVContainerでInjectする（Singleton不使用）
+/// - パズル側・タイマーのイベントをR3のObservableで購読する
+///   直接呼び出しをやめることでパズル・タイマーとの疎結合を実現した
+/// - リセット処理をResetAllSystems()に一本化した
+///   追加・変更があってもここだけ直せばよい（保守性・引き継ぎやすさの向上）
+/// 
 /// 画面遷移の流れ：
 /// TitleState → ManualState → CountdownState → PlayingState
 /// PlayingState → GameOverState or FinishState → ResultState
@@ -31,55 +39,50 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private GameObject _timerTextObject;  // タイマー表示（終了時に非表示）
 
     // VContainerでDI注入される依存クラス
+    // 依存クラスはVContainerでInjectする（Singleton不使用）
+    // IPuzzleField・IScoreWriterはInterface経由で注入し具体実装に依存しない設計にした
+    // YushaBrain・EnemySpawner・GameTimer・ResultManagerは現状具体型で注入している
+    // → IBattleField導入時にYushaBrainもInterface化する予定（次回改修リスト②）
+    private IPuzzleField _puzzleField;
     private GameTimer _gameTimer;
-    private DropPuzzleBattle _dropPuzzleBattle;
     private YushaBrain _yushaBrain;
     private EnemySpawner _enemySpawner;
-
-    // IPuzzleFieldを購読する（VContainerで注入される）
-    private IPuzzleField _puzzleField;
+    private IScoreWriter _scoreWriter;
+    private ResultManager _resultManager;
 
     // 現在のゲーム状態（Stateパターン）
+    // IGameState経由で管理することで状態クラスの追加・変更が容易
     private IGameState _currentState;
-
-    // IScoreWriterを購読する（VContainerで注入される）
-    private IScoreWriter _scoreWriter;
-
-    // ResultManagerを保持する（VContainerで注入される）
-    private ResultManager _resultManager;
 
     // ==================================================
     // Inject: VContainerから依存を注入される
+    // DropPuzzleBattle具体型ではなくIPuzzleField経由で受け取る
+    // → パズルの実装を差し替えてもGameFlowManagerは変更不要
     // ==================================================
     [Inject]
     public void Construct(
+        IPuzzleField puzzleField,
         GameTimer gameTimer,
-        DropPuzzleBattle dropPuzzleBattle,
         YushaBrain yushaBrain,
         EnemySpawner enemySpawner,
-        IPuzzleField puzzleField,
         IScoreWriter scoreWriter,
         ResultManager resultManager)
     {
+        _puzzleField = puzzleField;
         _gameTimer = gameTimer;
-        _dropPuzzleBattle = dropPuzzleBattle;
         _yushaBrain = yushaBrain;
         _enemySpawner = enemySpawner;
-        _puzzleField = puzzleField;
-
-        // IScoreWriterをInjectで受け取る
         _scoreWriter = scoreWriter;
-
-        // ResultManagerをInjectで受け取る
         _resultManager = resultManager;
     }
 
     // ==================================================
-    // Start: 初期状態をTitleStateに設定
+    // Start: 初期状態をTitleStateに設定する
     // ==================================================
     void Start()
     {
         // IPuzzleFieldのゲームオーバーObservableを購読する
+        // DropPuzzleBattleを直接知らずにゲームオーバーを検知できる（疎結合）
         // AddTo(this)でGameFlowManager破棄時に自動で購読解除する（メモリリーク防止）
         _puzzleField.OnGameOver
             .Subscribe(_ => ChangeState(new GameOverState(this)))
@@ -104,16 +107,17 @@ public class GameFlowManager : MonoBehaviour
 
     // ==================================================
     // Update: 現在の状態のUpdateを呼ぶ
+    // 状態ごとの処理は各StateクラスのUpdateに委譲する
     // ==================================================
     void Update()
     {
-        // 現在の状態のUpdateに処理を委譲する
         _currentState?.Update();
     }
 
     // ==================================================
     // ChangeState: 状態を切り替える
-    // 現在の状態のExit→新しい状態のEnterを呼ぶ
+    // 現在の状態のExit → 新しい状態のEnterを呼ぶ
+    // IGameState経由で管理するため状態クラスの追加時にここは変更不要
     // ==================================================
     public void ChangeState(IGameState newState)
     {
@@ -128,6 +132,8 @@ public class GameFlowManager : MonoBehaviour
     // ==================================================
     // パネル表示切替メソッド群
     // 各StateクラスのEnter・Exitから呼ばれる
+    // GameFlowManagerがパネルを一元管理することで
+    // 各StateがUIの実体を知らなくて済む設計にした
     // ==================================================
     public void ShowTitlePanel(bool show) => _titlePanel.SetActive(show);
     public void ShowManualPanel(bool show) => _manualPanel.SetActive(show);
@@ -136,6 +142,7 @@ public class GameFlowManager : MonoBehaviour
     public void ShowFinishPanel(bool show) => _finishPanel.SetActive(show);
 
     // キルカウント・タイマーの表示切替
+    // ゲーム終了時に非表示・再開時に再表示する
     public void ShowInGameUI(bool show)
     {
         _killCountObject?.SetActive(show);
@@ -152,12 +159,12 @@ public class GameFlowManager : MonoBehaviour
     }
 
     // ==================================================
-    // カウントダウン → GO! → PlayingStateへ遷移
-    // Time.timeScale = 0 中でも動くWaitForSecondsRealtimeを使用
+    // CountdownCoroutine: カウントダウン → GO! → PlayingStateへ遷移
+    // Time.timeScale = 0中でも動くWaitForSecondsRealtimeを使用する
     // ==================================================
     IEnumerator CountdownCoroutine()
     {
-        Time.timeScale = 0f; // カウントダウン中は止める
+        Time.timeScale = 0f; // カウントダウン中はゲームを止める
 
         _countdownText.text = "3";
         yield return new WaitForSecondsRealtime(1f);
@@ -168,7 +175,7 @@ public class GameFlowManager : MonoBehaviour
         _countdownText.text = "GO!";
         yield return new WaitForSecondsRealtime(0.8f);
 
-        // カウントダウン完了→PlayingStateへ遷移
+        // カウントダウン完了 → PlayingStateへ遷移
         ChangeState(new PlayingState(this));
     }
 
@@ -183,7 +190,8 @@ public class GameFlowManager : MonoBehaviour
 
     // ==================================================
     // StopYushaCameraShake: 勇者のカメラシェイクを止める
-    // GameOverState・FinishStateから呼ぶ
+    // ゲームオーバー・フィニッシュ時に呼ぶ
+    // 敵を倒した直後に終了した場合に揺れっぱなしになるバグを防ぐ
     // ==================================================
     public void StopYushaCameraShake()
     {
@@ -192,7 +200,7 @@ public class GameFlowManager : MonoBehaviour
 
     // ==================================================
     // EnableYushaCameraShake: 勇者のカメラシェイク禁止を解除する
-    // RestartFromCountdown・GoToTitleから呼ぶ
+    // ResetAllSystems()から呼ぶ
     // ==================================================
     public void EnableYushaCameraShake()
     {
@@ -209,27 +217,46 @@ public class GameFlowManager : MonoBehaviour
     }
 
     // ==================================================
+    // ResetAllSystems: 全システムをリセットする（共通処理）
+    // 
+    // RestartFromCountdown・GoToTitleの両方から呼ぶ
+    // リセット処理を1箇所にまとめることで
+    // 「片方だけ直し忘れる」バグを防ぐ（保守性・引き継ぎやすさの向上）
+    // 新しいリセット対象が増えてもここだけ追加すればよい（拡張性の向上）
+    // ==================================================
+    private void ResetAllSystems()
+    {
+        // パズルフィールドをリセット（IPuzzleField経由で具体型に依存しない）
+        _puzzleField?.ResetGame();
+
+        // タイマーをリセット
+        _gameTimer?.ResetTimer();
+
+        // 勇者を初期位置に戻す
+        _yushaBrain?.ResetPosition();
+
+        // 敵を全削除して再スポーン
+        _enemySpawner?.ResetEnemies();
+
+        // カメラシェイクの禁止を解除する
+        // （前回ゲームオーバー・フィニッシュで禁止されている場合があるため）
+        EnableYushaCameraShake();
+
+        // スコアをリセット（IScoreWriter経由で具体型に依存しない）
+        _scoreWriter?.ResetScore();
+
+        // インゲームUIを再表示（キルカウント・タイマー）
+        ShowInGameUI(true);
+    }
+
+    // ==================================================
     // RestartFromCountdown: もう一度プレイ
     // ResultStateから呼ばれる
     // ==================================================
     public void RestartFromCountdown()
     {
-        // 各システムをリセット
-        _dropPuzzleBattle?.ResetGame();
-        _gameTimer?.ResetTimer();
-        _yushaBrain?.ResetPosition();
-        _enemySpawner?.ResetEnemies();
-
-        // カメラシェイクの禁止を解除する（前回ゲームオーバーで禁止されている場合があるため）
-        EnableYushaCameraShake();
-
-        // スコアをリセット
-        _scoreWriter?.ResetScore();
-
-        // インゲームUIを再表示
-        ShowInGameUI(true);
-
-        // カウントダウン状態へ遷移
+        // 全システムをリセットしてカウントダウンへ
+        ResetAllSystems();
         ChangeState(new CountdownState(this));
     }
 
@@ -239,22 +266,8 @@ public class GameFlowManager : MonoBehaviour
     // ==================================================
     public void GoToTitle()
     {
-        // 各システムをリセット
-        _dropPuzzleBattle?.ResetGame();
-        _gameTimer?.ResetTimer();
-        _yushaBrain?.ResetPosition();
-        _enemySpawner?.ResetEnemies();
-
-        // カメラシェイクの禁止を解除する（前回ゲームオーバーで禁止されている場合があるため）
-        EnableYushaCameraShake();
-
-        // スコアをリセット
-        _scoreWriter?.ResetScore();
-
-        // インゲームUIを再表示
-        ShowInGameUI(true);
-
-        // タイトル状態へ遷移
+        // 全システムをリセットしてタイトルへ
+        ResetAllSystems();
         ChangeState(new TitleState(this));
     }
 }

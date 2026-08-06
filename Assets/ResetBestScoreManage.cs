@@ -20,8 +20,9 @@ public class ResetBestScoreManager : MonoBehaviour
 
     // ==================================================
     // Start: ボタンにイベントを登録する
-    // AddListenerで登録することでInspectorに依存せず
-    // コードで管理できる（引き継ぎやすさの向上）
+    // ボタンの参照はSerializeFieldで受け取り
+    // イベント登録はAddListenerでコードで管理する
+    // → OnClickイベントをInspectorで設定するより変更・引き継ぎがしやすい
     // ==================================================
     void Start()
     {
