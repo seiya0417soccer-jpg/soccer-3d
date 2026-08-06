@@ -8,11 +8,7 @@ public class GumiData
 
     public GumiData()
     {
-#if true
         InitPieces();
-#else
-        InitDebugPieces();
-#endif
     }
 
     void InitPieces()
@@ -27,22 +23,9 @@ public class GumiData
         pieceData[6] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(-1, 1) };
         pieceData[7] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(0, 1), new Vector2Int(1, 1) };
         pieceData[8] = new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(0, 1), new Vector2Int(1, 1) };
-        pieceData[9] = new[] { new Vector2Int(0, 0) };                      // Piece9（白・1マス）
-        pieceData[11] = new[] { new Vector2Int(0, 0) };                      // EKeyBomb（1マス）
-    }
-
-    void InitDebugPieces()
-    {
-        pieceData = new Dictionary<int, Vector2Int[]>();
-        pieceData[0] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
-        pieceData[1] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
-        pieceData[2] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
-        pieceData[3] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
-        pieceData[4] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
-        pieceData[5] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
-        pieceData[6] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
-        pieceData[7] = new[] { new Vector2Int(-1, 0), new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) };
-        pieceData[8] = new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(0, 1), new Vector2Int(1, 1) };
+        pieceData[9] = new[] { new Vector2Int(0, 0) }; // Piece9（白・1マス）
+        // CrossBomb（index=10）はスポーンしない・FixPiece()でフィールドに直接書き込まれる
+        pieceData[11] = new[] { new Vector2Int(0, 0) }; // EKeyBomb（1マス）
     }
 
     public Color[] pieceColors =
