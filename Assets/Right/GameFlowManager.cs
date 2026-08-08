@@ -1,5 +1,7 @@
+using Cysharp.Threading.Tasks;
 using R3;
 using System.Collections;
+using System.Threading;
 using TMPro;
 using UnityEngine;
 using VContainer;
@@ -22,32 +24,37 @@ using VContainer;
 /// 画面遷移の流れ：
 /// TitleState → ManualState → CountdownState → PlayingState
 /// PlayingState → GameOverState or FinishState → ResultState
-/// ResultState → CountdownState or TitleState
+/// ResultState → CountdownState or TitleState or RankingSubmitState
+/// RankingSubmitState → RankingViewState → TitleState
 /// </summary>
 public class GameFlowManager : MonoBehaviour
 {
     [Header("Panels")]
-    [SerializeField] private GameObject _titlePanel;    // タイトル画面
-    [SerializeField] private GameObject _manualPanel;   // 操作説明画面
-    [SerializeField] private GameObject _readyGoGroup;  // カウントダウン画面
-    [SerializeField] private GameObject _gameOverPanel; // ゲームオーバー画面
-    [SerializeField] private GameObject _finishPanel;   // フィニッシュ画面
+    [SerializeField] private GameObject _titlePanel;         // タイトル画面
+    [SerializeField] private GameObject _manualPanel;        // 操作説明画面
+    [SerializeField] private GameObject _readyGoGroup;       // カウントダウン画面
+    [SerializeField] private GameObject _gameOverPanel;      // ゲームオーバー画面
+    [SerializeField] private GameObject _finishPanel;        // フィニッシュ画面
+    [SerializeField] private GameObject _rankingSubmitPanel; // 名前入力・スコア送信パネル
+    [SerializeField] private GameObject _rankingViewPanel;   // ランキング表示パネル
 
     [Header("ReadyGo")]
     [SerializeField] private TextMeshProUGUI _countdownText; // 3,2,1,GO!を表示するTMPテキスト
 
     [Header("UI")]
-    [SerializeField] private GameObject _killCountObject;  // キルカウント表示（終了時に非表示）
-    [SerializeField] private GameObject _timerTextObject;  // タイマー表示（終了時に非表示）
+    [SerializeField] private GameObject _killCountObject;    // キルカウント表示（終了時に非表示）
+    [SerializeField] private GameObject _timerTextObject;    // タイマー表示（終了時に非表示）
 
     // VContainerでDI注入される依存クラス（全てInterface経由・具体型に依存しない）
-    private IPuzzleField _puzzleField;       // パズル側との疎結合
-    private IBattleField _battleField;       // バトル側との疎結合（ResetPosition用）
-    private ICameraShakeable _cameraShakeable; // カメラ演出の責務を分離
+    private IPuzzleField _puzzleField;           // パズル側との疎結合
+    private IBattleField _battleField;           // バトル側との疎結合（ResetPosition用）
+    private ICameraShakeable _cameraShakeable;   // カメラ演出の責務を分離
     private GameTimer _gameTimer;
     private EnemySpawner _enemySpawner;
     private IScoreWriter _scoreWriter;
     private ResultManager _resultManager;
+    private RankingSubmitUI _rankingSubmitUI;    // 名前入力・スコア送信UI
+    private RankingView _rankingView;            // ランキング表示UI
 
     // 現在のゲーム状態（Stateパターン）
     // IGameState経由で管理することで状態クラスの追加・変更が容易
@@ -67,7 +74,9 @@ public class GameFlowManager : MonoBehaviour
         GameTimer gameTimer,
         EnemySpawner enemySpawner,
         IScoreWriter scoreWriter,
-        ResultManager resultManager)
+        ResultManager resultManager,
+        RankingSubmitUI rankingSubmitUI,
+        RankingView rankingView)
     {
         _puzzleField = puzzleField;
         _battleField = battleField;
@@ -76,6 +85,8 @@ public class GameFlowManager : MonoBehaviour
         _enemySpawner = enemySpawner;
         _scoreWriter = scoreWriter;
         _resultManager = resultManager;
+        _rankingSubmitUI = rankingSubmitUI;
+        _rankingView = rankingView;
     }
 
     // ==================================================
@@ -102,6 +113,8 @@ public class GameFlowManager : MonoBehaviour
         _readyGoGroup.SetActive(false);
         _gameOverPanel.SetActive(false);
         _finishPanel.SetActive(false);
+        _rankingSubmitPanel?.SetActive(false);
+        _rankingViewPanel?.SetActive(false);
 
         // 最初の状態はタイトル画面
         ChangeState(new TitleState(this));
@@ -142,6 +155,8 @@ public class GameFlowManager : MonoBehaviour
     public void ShowReadyGoPanel(bool show) => _readyGoGroup.SetActive(show);
     public void ShowGameOverPanel(bool show) => _gameOverPanel.SetActive(show);
     public void ShowFinishPanel(bool show) => _finishPanel.SetActive(show);
+    public void ShowRankingSubmitPanel(bool show) => _rankingSubmitPanel?.SetActive(show);
+    public void ShowRankingViewPanel(bool show) => _rankingViewPanel?.SetActive(show);
 
     // キルカウント・タイマーの表示切替
     // ゲーム終了時に非表示・再開時に再表示する
@@ -221,6 +236,42 @@ public class GameFlowManager : MonoBehaviour
     }
 
     // ==================================================
+    // GoToRankingSubmit: ランキング登録画面へ遷移する
+    // ResultStateのボタンから呼ぶ
+    // ==================================================
+    public void GoToRankingSubmit()
+    {
+        ChangeState(new RankingSubmitState(this));
+    }
+
+    // ==================================================
+    // GoToRankingView: ランキング表示画面へ遷移する
+    // RankingSubmitStateの送信完了後に呼ぶ
+    // ==================================================
+    public void GoToRankingView()
+    {
+        ChangeState(new RankingViewState(this));
+    }
+
+    // ==================================================
+    // LoadRanking: ランキングデータを取得して表示する
+    // RankingViewStateのEnterから呼ぶ
+    // ==================================================
+    public void LoadRanking()
+    {
+        _rankingView?.LoadAndDisplay(this.GetCancellationTokenOnDestroy());
+    }
+
+    // ==================================================
+    // GetRankingSubmitUI: RankingSubmitUIを取得する
+    // RankingSubmitStateから呼ぶ
+    // ==================================================
+    public RankingSubmitUI GetRankingSubmitUI()
+    {
+        return _rankingSubmitUI;
+    }
+
+    // ==================================================
     // ResetAllSystems: 全システムをリセットする（共通処理）
     // 
     // RestartFromCountdown・GoToTitleの両方から呼ぶ
@@ -266,7 +317,7 @@ public class GameFlowManager : MonoBehaviour
 
     // ==================================================
     // GoToTitle: タイトルへ戻る
-    // ResultStateから呼ばれる
+    // ResultState・RankingViewStateから呼ばれる
     // ==================================================
     public void GoToTitle()
     {
