@@ -16,6 +16,8 @@ using VContainer;
 ///   直接呼び出しをやめることでパズル・タイマーとの疎結合を実現した
 /// - リセット処理をResetAllSystems()に一本化した
 ///   追加・変更があってもここだけ直せばよい（保守性・引き継ぎやすさの向上）
+/// - YushaBrain具体型をICameraShakeable・IBattleFieldに置き換えた
+///   → カメラ演出の責務をバトルの責務から分離した（拡張性の向上）
 /// 
 /// 画面遷移の流れ：
 /// TitleState → ManualState → CountdownState → PlayingState
@@ -38,14 +40,11 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private GameObject _killCountObject;  // キルカウント表示（終了時に非表示）
     [SerializeField] private GameObject _timerTextObject;  // タイマー表示（終了時に非表示）
 
-    // VContainerでDI注入される依存クラス
-    // 依存クラスはVContainerでInjectする（Singleton不使用）
-    // IPuzzleField・IScoreWriterはInterface経由で注入し具体実装に依存しない設計にした
-    // YushaBrain・EnemySpawner・GameTimer・ResultManagerは現状具体型で注入している
-    // → IBattleField導入時にYushaBrainもInterface化する予定（次回改修リスト②）
-    private IPuzzleField _puzzleField;
+    // VContainerでDI注入される依存クラス（全てInterface経由・具体型に依存しない）
+    private IPuzzleField _puzzleField;       // パズル側との疎結合
+    private IBattleField _battleField;       // バトル側との疎結合（ResetPosition用）
+    private ICameraShakeable _cameraShakeable; // カメラ演出の責務を分離
     private GameTimer _gameTimer;
-    private YushaBrain _yushaBrain;
     private EnemySpawner _enemySpawner;
     private IScoreWriter _scoreWriter;
     private ResultManager _resultManager;
@@ -56,21 +55,24 @@ public class GameFlowManager : MonoBehaviour
 
     // ==================================================
     // Inject: VContainerから依存を注入される
-    // DropPuzzleBattle具体型ではなくIPuzzleField経由で受け取る
-    // → パズルの実装を差し替えてもGameFlowManagerは変更不要
+    // YushaBrain具体型をICameraShakeable・IBattleFieldに置き換えた
+    // → カメラ演出とバトルの責務を分離することで
+    //   将来どちらかの実装を変えても影響を受けない（拡張性の向上）
     // ==================================================
     [Inject]
     public void Construct(
         IPuzzleField puzzleField,
+        IBattleField battleField,
+        ICameraShakeable cameraShakeable,
         GameTimer gameTimer,
-        YushaBrain yushaBrain,
         EnemySpawner enemySpawner,
         IScoreWriter scoreWriter,
         ResultManager resultManager)
     {
         _puzzleField = puzzleField;
+        _battleField = battleField;
+        _cameraShakeable = cameraShakeable;
         _gameTimer = gameTimer;
-        _yushaBrain = yushaBrain;
         _enemySpawner = enemySpawner;
         _scoreWriter = scoreWriter;
         _resultManager = resultManager;
@@ -189,22 +191,24 @@ public class GameFlowManager : MonoBehaviour
     }
 
     // ==================================================
-    // StopYushaCameraShake: 勇者のカメラシェイクを止める
+    // StopYushaCameraShake: カメラシェイクを止める
     // ゲームオーバー・フィニッシュ時に呼ぶ
     // 敵を倒した直後に終了した場合に揺れっぱなしになるバグを防ぐ
+    // ICameraShakeable経由で呼ぶことでYushaBrain具体型に依存しない
     // ==================================================
     public void StopYushaCameraShake()
     {
-        _yushaBrain?.StopCameraShake();
+        _cameraShakeable?.StopCameraShake();
     }
 
     // ==================================================
-    // EnableYushaCameraShake: 勇者のカメラシェイク禁止を解除する
+    // EnableYushaCameraShake: カメラシェイクの禁止を解除する
     // ResetAllSystems()から呼ぶ
+    // ICameraShakeable経由で呼ぶことでYushaBrain具体型に依存しない
     // ==================================================
     public void EnableYushaCameraShake()
     {
-        _yushaBrain?.EnableCameraShake();
+        _cameraShakeable?.EnableCameraShake();
     }
 
     // ==================================================
@@ -232,8 +236,8 @@ public class GameFlowManager : MonoBehaviour
         // タイマーをリセット
         _gameTimer?.ResetTimer();
 
-        // 勇者を初期位置に戻す
-        _yushaBrain?.ResetPosition();
+        // 勇者を初期位置に戻す（IBattleField経由で具体型に依存しない）
+        _battleField?.ResetPosition();
 
         // 敵を全削除して再スポーン
         _enemySpawner?.ResetEnemies();
