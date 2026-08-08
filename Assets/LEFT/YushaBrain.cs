@@ -3,22 +3,26 @@ using UnityEngine;
 using UnityEngine.AI;
 using VContainer;
 using R3;
+
 /// <summary>
 /// YushaBrain.cs
 /// 勇者のAI制御
 /// 
-/// - 最も近い敵を追いかけて攻撃
-/// - 敵が倒されたらEnemySpawnerに通知して次の敵をスポーン
-/// - 移動中はRunアニメーション、攻撃時はAttackアニメーション
+/// - 最も近い敵を追いかけて攻撃する
+/// - 敵が倒されたらEnemySpawnerに通知して次の敵をスポーンさせる
+/// - 移動中はRunアニメーション・攻撃時はAttackアニメーション
 /// - バフ・デバフによる速度変更
 /// - デバフ中はUpdate処理をスキップしてアニメーションが上書きされないようにする
 /// - もう一度プレイ時にResetPosition()で初期位置に戻す
-/// - IScoreWriterを通してスコアを加算（ScoreManager直接参照をやめる）
+/// - IScoreWriterを通してスコアを加算する（ScoreManager直接参照をやめる）
 /// - 敵を倒した時にCameraFollowのShakeCamera()を呼んで画面を揺らす
 /// - バフ量に応じてシアン色に発光・デバフ時に赤く発光する
-/// - YushaSettingSOでパラメーターを管理（プランナーが調整可能）
+/// - YushaSettingSOでパラメーターを管理する（プランナーが調整可能）
+/// - IBattleFieldを実装してバトル側の抽象インターフェースを提供する
+/// - ICameraShakeableを実装してカメラ演出の責務を分離する
+///   → GameFlowManagerがYushaBrain具体型を知らなくてもカメラ操作できる
 /// </summary>
-public class YushaBrain : MonoBehaviour, IBattleField
+public class YushaBrain : MonoBehaviour, IBattleField, ICameraShakeable
 {
     // タグ文字列をハードコードせず定数化（タイプミス防止）
     private const string EnemyTag = "Enemy";
@@ -63,7 +67,7 @@ public class YushaBrain : MonoBehaviour, IBattleField
     public Observable<Unit> OnEnemyDefeated => _onEnemyDefeated;
 
     // ==================================================
-    // デバフ終了時に発火するSubject
+    // IBattleField実装：デバフ終了時に発火するSubject
     // 発火する権利はYushaBrainだけが持ち、外部にはObservableとして公開する
     // ==================================================
     private readonly Subject<Unit> _onDebuffFinished = new Subject<Unit>();
@@ -152,9 +156,10 @@ public class YushaBrain : MonoBehaviour, IBattleField
             }
         }
     }
+
     // ==================================================
-    // 攻撃モーションの頭出し後にDestroyする
-    // attackDelay秒待ってから敵を消去してスコア加算
+    // DestroyAfterAnim: 攻撃モーションの頭出し後にDestroyする
+    // attackDelay秒待ってから敵を消去してスコア加算する
     // EnemySpawnerに通知して次の敵をスポーンさせる
     // ==================================================
     IEnumerator DestroyAfterAnim(GameObject enemy)
@@ -193,7 +198,7 @@ public class YushaBrain : MonoBehaviour, IBattleField
     }
 
     // ==================================================
-    // 最も近い敵を取得
+    // GetNearestEnemy: 最も近い敵を取得する
     // ==================================================
     GameObject GetNearestEnemy()
     {
@@ -214,7 +219,7 @@ public class YushaBrain : MonoBehaviour, IBattleField
     }
 
     // ==================================================
-    // 速度バフ適用
+    // IBattleField実装：速度バフ適用
     // BattleMainManagerから呼ぶ
     // ==================================================
     public void UpdateSpeed(float bonusSpeed)
@@ -224,7 +229,7 @@ public class YushaBrain : MonoBehaviour, IBattleField
     }
 
     // ==================================================
-    // 発光強度を設定する
+    // IBattleField実装：発光強度を設定する
     // BattleMainManagerからバフ量に応じて呼ぶ
     // intensityが0なら発光なし・大きいほど強く光る
     // デバフ中はバフの発光で上書きしない
@@ -240,7 +245,7 @@ public class YushaBrain : MonoBehaviour, IBattleField
     }
 
     // ==================================================
-    // デバフ時の発光色を設定する
+    // IBattleField実装：デバフ時の発光色を設定する
     // デバフ中は赤く光らせる
     // ==================================================
     public void SetDebuffEmission(bool isDebuff)
@@ -256,7 +261,7 @@ public class YushaBrain : MonoBehaviour, IBattleField
     }
 
     // ==================================================
-    // Eキーデバフ適用
+    // IBattleField実装：Eキーデバフ適用
     // BattleMainManagerから呼ぶ
     // ==================================================
     public void ApplyEKeyDebuff(float duration)
@@ -267,7 +272,7 @@ public class YushaBrain : MonoBehaviour, IBattleField
     }
 
     // ==================================================
-    // デバフCoroutine
+    // DebuffCoroutine: デバフCoroutine
     // デバフ中フラグをtrueにしてUpdateをスキップさせる
     // デバフ終了後にBattleMainManagerへ通知して
     // 現在有効なバフ量を再反映してもらう
@@ -293,7 +298,7 @@ public class YushaBrain : MonoBehaviour, IBattleField
     }
 
     // ==================================================
-    // 初期位置にリセット
+    // IBattleField実装：初期位置にリセットする
     // GameFlowManagerから呼ぶ
     // ==================================================
     public void ResetPosition()
@@ -313,10 +318,9 @@ public class YushaBrain : MonoBehaviour, IBattleField
     }
 
     // ==================================================
-    // カメラシェイクを強制停止する
-    // GameOverState・FinishStateから呼ぶ
-    // シェイク中にゲームオーバー/フィニッシュになった場合、
-    // 揺れっぱなしにならないようにする
+    // ICameraShakeable実装：カメラシェイクを強制停止する
+    // ゲームオーバー・フィニッシュ時にGameFlowManagerから呼ぶ
+    // シェイク中に終了した場合に揺れっぱなしになるバグを防ぐ
     // ==================================================
     public void StopCameraShake()
     {
@@ -324,8 +328,8 @@ public class YushaBrain : MonoBehaviour, IBattleField
     }
 
     // ==================================================
-    // カメラシェイクの禁止を解除する
-    // GameFlowManagerのRestartFromCountdown・GoToTitleから呼ぶ
+    // ICameraShakeable実装：カメラシェイクの禁止を解除する
+    // もう一度プレイ・タイトル復帰時にGameFlowManagerから呼ぶ
     // ==================================================
     public void EnableCameraShake()
     {
