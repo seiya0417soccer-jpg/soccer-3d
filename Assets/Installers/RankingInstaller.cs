@@ -5,10 +5,12 @@ using VContainer.Unity;
 /// RankingInstaller.cs
 /// ランキング機能関連クラスをDI登録する
 /// 
-/// - IScoreApiClient・IScoreRepository・各Repositoryをまとめる
+/// - IScoreApiClient・IScoreRepository・各Repository・UIをまとめる
 /// - DockerScoreApiClientとFakeScoreApiClientを切り替えるには
 ///   コメントアウトを変えるだけでよい（拡張性の向上）
 /// - サーバーURLはここで一元管理する
+/// - RankingSubmitUI・RankingViewはランキング機能のUIのため
+///   他のInstallerではなくここで登録する（責務の一貫性）
 /// </summary>
 public class RankingInstaller : IInstaller
 {
@@ -28,5 +30,9 @@ public class RankingInstaller : IInstaller
 
         // LocalScoreRepository（PlayerPrefsでローカル保存）
         builder.Register<LocalScoreRepository>(Lifetime.Singleton);
+
+        // ランキングUI（ランキング機能の一部のためここで登録する）
+        builder.RegisterComponentInHierarchy<RankingSubmitUI>();
+        builder.RegisterComponentInHierarchy<RankingView>();
     }
 }
