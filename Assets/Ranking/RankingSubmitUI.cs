@@ -35,9 +35,9 @@ public class RankingSubmitUI : MonoBehaviour
     // ==================================================
     [Inject]
     public void Construct(
-        ApiScoreRepository scoreRepository,
-        IScoreReader scoreReader,
-        GameFlowManager gameFlowManager)
+    IScoreRepository scoreRepository,
+    IScoreReader scoreReader,
+    GameFlowManager gameFlowManager)
     {
         _scoreRepository = scoreRepository;
         _scoreReader = scoreReader;

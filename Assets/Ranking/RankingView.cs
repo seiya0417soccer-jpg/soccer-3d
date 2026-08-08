@@ -26,7 +26,7 @@ public class RankingView : MonoBehaviour
     // Inject: VContainer‚©‚çˆË‘¶‚ğ’“ü‚³‚ê‚é
     // ==================================================
     [Inject]
-    public void Construct(ApiScoreRepository scoreRepository)
+    public void Construct(IScoreRepository scoreRepository)
     {
         _scoreRepository = scoreRepository;
     }

@@ -9,8 +9,8 @@ using VContainer.Unity;
 /// - DockerScoreApiClientとFakeScoreApiClientを切り替えるには
 ///   コメントアウトを変えるだけでよい（拡張性の向上）
 /// - サーバーURLはここで一元管理する
-/// - RankingSubmitUI・RankingViewはランキング機能のUIのため
-///   他のInstallerではなくここで登録する（責務の一貫性）
+/// - FallbackScoreRepositoryでAPI失敗時にLocalへフォールバックする
+///   → Docker未起動時でもランキング機能が動作する
 /// </summary>
 public class RankingInstaller : IInstaller
 {
@@ -30,6 +30,11 @@ public class RankingInstaller : IInstaller
 
         // LocalScoreRepository（PlayerPrefsでローカル保存）
         builder.Register<LocalScoreRepository>(Lifetime.Singleton);
+
+        // FallbackScoreRepository（API失敗時にLocalへフォールバック）
+        // IScoreRepositoryとして登録することでUI側は通信先を意識しない
+        builder.Register<FallbackScoreRepository>(Lifetime.Singleton)
+            .As<IScoreRepository>();
 
         // ランキングUI（ランキング機能の一部のためここで登録する）
         builder.RegisterComponentInHierarchy<RankingSubmitUI>();
