@@ -5,7 +5,7 @@ using VContainer.Unity;
 /// GameLifetimeScope.cs
 /// VContainerのDIコンテナ設定
 /// 
-/// - CoreInstaller・PuzzleInstaller・BattleInstallerに
+/// - CoreInstaller・PuzzleInstaller・BattleInstaller・RankingInstallerに
 ///   責務を分割して登録する
 /// - 「どこに何が登録されているか」を一目でわかるようにした
 /// - VContainer標準のIInstallerを使い、RegisterInstallerで登録する
@@ -22,5 +22,8 @@ public class GameLifetimeScope : LifetimeScope
 
         // バトル画面関連（YushaBrain・BattleMainManager・EnemySpawner・GameTimer）
         new BattleInstaller().Install(builder);
+
+        // ランキング機能関連（IScoreApiClient・ApiScoreRepository・LocalScoreRepository）
+        new RankingInstaller().Install(builder);
     }
 }
