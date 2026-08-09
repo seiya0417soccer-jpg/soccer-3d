@@ -1,7 +1,6 @@
 using Cysharp.Threading.Tasks;
 using R3;
 using System.Collections;
-using System.Threading;
 using TMPro;
 using UnityEngine;
 using VContainer;
@@ -234,14 +233,14 @@ public class GameFlowManager : MonoBehaviour
     {
         return _resultManager;
     }
-
     // ==================================================
     // GoToRankingSubmit: ƒ‰ƒ“ƒLƒ“ƒO“o˜^‰æ–Ê‚Ö‘JˆÚ‚·‚é
     // ResultState‚Ìƒ{ƒ^ƒ“‚©‚çŒÄ‚Ô
+    // RankingSubmitUI‚ğState‚É“n‚µ‚ÄObservable‚ğw“Ç‚³‚¹‚é
     // ==================================================
     public void GoToRankingSubmit()
     {
-        ChangeState(new RankingSubmitState(this));
+        ChangeState(new RankingSubmitState(this, _rankingSubmitUI));
     }
 
     // ==================================================
@@ -260,15 +259,6 @@ public class GameFlowManager : MonoBehaviour
     public void LoadRanking()
     {
         _rankingView?.LoadAndDisplay(this.GetCancellationTokenOnDestroy());
-    }
-
-    // ==================================================
-    // GetRankingSubmitUI: RankingSubmitUI‚ğæ“¾‚·‚é
-    // RankingSubmitState‚©‚çŒÄ‚Ô
-    // ==================================================
-    public RankingSubmitUI GetRankingSubmitUI()
-    {
-        return _rankingSubmitUI;
     }
 
     // ==================================================
