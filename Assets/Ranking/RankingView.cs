@@ -1,5 +1,5 @@
 using Cysharp.Threading.Tasks;
-using System.Collections.Generic;
+using R3;
 using System.Threading;
 using TMPro;
 using UnityEngine;
@@ -9,26 +9,30 @@ using VContainer;
 /// RankingView.cs
 /// ランキングTOP5を表示するUIクラス
 /// 
-/// - IScoreRepositoryを通してランキングを取得する（具体型に依存しない）
-/// - LoadAndDisplay()でランキングを取得して表示する
+/// - RankingViewModelを通してランキングを取得・表示する
+///   → IScoreRepositoryを直接知らなくていい設計にした（責務分離）
+/// - RankingViewModelのStateを購読して表示を切り替える
+///   → Loading・Success・Errorを可視化する
+/// - otameshiで検証したViewModel層をsoccer-3dに適用した
 /// - エントリはPrefabを生成して表示する
 /// </summary>
 public class RankingView : MonoBehaviour
 {
-    [SerializeField] private Transform _entryContainer;  // エントリを並べる親オブジェクト
-    [SerializeField] private GameObject _entryPrefab;    // 1行分のエントリPrefab
+    [SerializeField] private Transform _entryContainer;   // エントリを並べる親オブジェクト
+    [SerializeField] private GameObject _entryPrefab;     // 1行分のエントリPrefab
     [SerializeField] private TextMeshProUGUI _statusText; // 取得状態を表示するテキスト
 
-    // IScoreRepository経由でランキングを取得する（具体型に依存しない）
-    private IScoreRepository _scoreRepository;
+    // RankingViewModelを通してランキングを取得する
+    // IScoreRepositoryを直接知らなくていい設計にした
+    private RankingViewModel _viewModel;
 
     // ==================================================
     // Inject: VContainerから依存を注入される
     // ==================================================
     [Inject]
-    public void Construct(IScoreRepository scoreRepository)
+    public void Construct(RankingViewModel viewModel)
     {
-        _scoreRepository = scoreRepository;
+        _viewModel = viewModel;
     }
 
     // ==================================================
@@ -37,40 +41,50 @@ public class RankingView : MonoBehaviour
     // ==================================================
     public void LoadAndDisplay(CancellationToken ct)
     {
-        LoadAsync(ct).Forget();
+        // ViewModelのStateを購読して表示を切り替える
+        // AddTo(this)でMonoBehaviour破棄時に自動で購読解除する
+        _viewModel.State
+            .Subscribe(state => OnStateChanged(state))
+            .AddTo(this);
+
+        // ViewModelのRankingsを購読してエントリを表示する
+        _viewModel.Rankings
+            .Subscribe(rankings =>
+            {
+                if (rankings == null) return;
+                ClearEntries();
+                DisplayRanking(rankings);
+            })
+            .AddTo(this);
+
+        // ランキングを取得する
+        _viewModel.LoadAsync(ct).Forget();
     }
 
     // ==================================================
-    // LoadAsync: ランキングを非同期で取得して表示する
-    // 取得中はStatusTextに状態を表示する
+    // OnStateChanged: Stateに応じて表示を切り替える
+    // Loading・Success・Errorを可視化する
     // ==================================================
-    private async UniTaskVoid LoadAsync(CancellationToken ct)
+    private void OnStateChanged(RankingState state)
     {
-        _statusText.text = "取得中...";
-        ClearEntries();
-
-        try
+        if (state is LoadingState)
         {
-            List<PlayerScoreData> rankings = await _scoreRepository.GetRankingAsync(ct);
+            _statusText.text = "取得中...";
+        }
+        else if (state is SuccessState)
+        {
             _statusText.text = "";
-            DisplayRanking(rankings);
         }
-        catch (System.OperationCanceledException)
+        else if (state is ErrorState errorState)
         {
-            // キャンセルは正常系として扱う
-            return;
-        }
-        catch (System.Exception e)
-        {
-            _statusText.text = "取得失敗";
-            Debug.LogError($"RankingView: 取得失敗 → {e.Message}");
+            _statusText.text = $"取得失敗: {errorState.Message}";
         }
     }
 
     // ==================================================
     // DisplayRanking: ランキングをエントリとして表示する
     // ==================================================
-    private void DisplayRanking(List<PlayerScoreData> rankings)
+    private void DisplayRanking(System.Collections.Generic.List<PlayerScoreData> rankings)
     {
         for (int i = 0; i < rankings.Count; i++)
         {
