@@ -11,11 +11,12 @@ using VContainer;
 /// 名前入力・スコア送信UIの管理クラス
 /// 
 /// - プレイヤーが名前を入力してスコアをオンラインに送信する
+/// - RankingViewModelを通してスコアを送信する
+///   → IScoreRepositoryを直接知らなくていい設計にした（責務分離）
+/// - ViewModelのStateを購読して送信中・成功・失敗を可視化する
 /// - 送信完了・キャンセルをObservableで通知する
 ///   → GameFlowManagerを直接知らなくていい設計にした（疎結合）
-///   → IPuzzleField・IBattleFieldと同じ思想で一貫している
-/// - RankingSubmitStateがObservableを購読して遷移を判断する
-/// - CancellationTokenでMonoBehaviour破棄時に通信を安全にキャンセルする
+/// - otameshiで検証したViewModelをsoccer-3dに適用した
 /// </summary>
 public class RankingSubmitUI : MonoBehaviour
 {
@@ -24,15 +25,14 @@ public class RankingSubmitUI : MonoBehaviour
     [SerializeField] private Button _cancelButton;           // キャンセルボタン
     [SerializeField] private TextMeshProUGUI _statusText;    // 送信状態を表示するテキスト
 
-    // IScoreRepositoryを通してスコアを送信する（具体型に依存しない）
-    private IScoreRepository _scoreRepository;
+    // RankingViewModelを通してスコアを送信する（IScoreRepositoryを直接知らない）
+    private RankingViewModel _viewModel;
 
     // IScoreReaderを通して現在のスコアを読み取る
     private IScoreReader _scoreReader;
 
     // ==================================================
     // 送信完了時に発火するSubject
-    // 発火する権利はRankingSubmitUIだけが持ち外部にはObservableとして公開する
     // RankingSubmitStateがこれを購読してRankingViewStateへ遷移する
     // ==================================================
     private readonly Subject<Unit> _onSubmitCompleted = new Subject<Unit>();
@@ -47,25 +47,31 @@ public class RankingSubmitUI : MonoBehaviour
 
     // ==================================================
     // Inject: VContainerから依存を注入される
-    // GameFlowManagerを受け取らない設計にした
-    // → UIは通知するだけ・遷移の判断はStateが行う（責務分離）
+    // RankingViewModelを受け取る（IScoreRepositoryは受け取らない）
     // ==================================================
     [Inject]
     public void Construct(
-        IScoreRepository scoreRepository,
+        RankingViewModel viewModel,
         IScoreReader scoreReader)
     {
-        _scoreRepository = scoreRepository;
+        _viewModel = viewModel;
         _scoreReader = scoreReader;
     }
 
     // ==================================================
     // Start: ボタンにイベントを登録する
+    // ViewModelのStateを購読して表示を切り替える
     // ==================================================
     void Start()
     {
         _submitButton.onClick.AddListener(OnSubmitClicked);
         _cancelButton.onClick.AddListener(OnCancelClicked);
+
+        // ViewModelのStateを購読して送信状態を可視化する
+        // AddTo(this)でMonoBehaviour破棄時に自動で購読解除する（メモリリーク防止）
+        _viewModel.State
+            .Subscribe(state => OnStateChanged(state))
+            .AddTo(this);
     }
 
     // ==================================================
@@ -73,9 +79,34 @@ public class RankingSubmitUI : MonoBehaviour
     // ==================================================
     void OnDestroy()
     {
-        // メモリリーク防止のためSubjectを破棄する
         _onSubmitCompleted.Dispose();
         _onCancelled.Dispose();
+    }
+
+    // ==================================================
+    // OnStateChanged: Stateに応じて表示を切り替える
+    // Loading・Success・Errorを可視化する
+    // ==================================================
+    private void OnStateChanged(RankingState state)
+    {
+        if (state is LoadingState)
+        {
+            _statusText.text = "送信中...";
+            _submitButton.interactable = false;
+            _cancelButton.interactable = false;
+        }
+        else if (state is SuccessState)
+        {
+            _statusText.text = "送信完了！";
+            // 送信完了を通知する
+            _onSubmitCompleted.OnNext(Unit.Default);
+        }
+        else if (state is ErrorState errorState)
+        {
+            _statusText.text = $"送信失敗: {errorState.Message}";
+            _submitButton.interactable = true;
+            _cancelButton.interactable = true;
+        }
     }
 
     // ==================================================
@@ -87,9 +118,8 @@ public class RankingSubmitUI : MonoBehaviour
     }
 
     // ==================================================
-    // SubmitAsync: スコアをAPIサーバーに送信する非同期処理
-    // 送信中はボタンを無効化してStatusTextに状態を表示する
-    // 送信完了後はOnSubmitCompletedを発火してStateに通知する
+    // SubmitAsync: ViewModelを通してスコアを送信する
+    // 送信処理・エラーハンドリングはViewModelが担当する
     // ==================================================
     private async UniTaskVoid SubmitAsync(CancellationToken ct)
     {
@@ -99,42 +129,16 @@ public class RankingSubmitUI : MonoBehaviour
         if (string.IsNullOrEmpty(playerName))
             playerName = "名無し";
 
-        // 送信中はボタンを無効化する
-        _submitButton.interactable = false;
-        _cancelButton.interactable = false;
-        _statusText.text = "送信中...";
-
         var scoreData = new PlayerScoreData(playerName, _scoreReader.Score);
 
-        try
-        {
-            await _scoreRepository.SaveScoreAsync(scoreData, ct);
-            _statusText.text = "送信完了！";
-
-            // 少し待ってから送信完了を通知する
-            // RankingSubmitStateがこれを受けてRankingViewStateへ遷移する
-            await UniTask.Delay(500, cancellationToken: ct);
-            _onSubmitCompleted.OnNext(Unit.Default);
-        }
-        catch (System.OperationCanceledException)
-        {
-            // キャンセルは正常系として扱う（シーン遷移時等）
-            return;
-        }
-        catch (System.Exception e)
-        {
-            // 送信失敗時はエラーを表示してボタンを再有効化する
-            _statusText.text = "送信失敗...もう一度試してください";
-            _submitButton.interactable = true;
-            _cancelButton.interactable = true;
-            Debug.LogError($"RankingSubmitUI: 送信失敗 → {e.Message}");
-        }
+        // ViewModelを通して送信する
+        // 状態管理・エラーハンドリングはViewModelが担当する
+        await _viewModel.SubmitAsync(scoreData, ct);
     }
 
     // ==================================================
     // OnCancelClicked: キャンセルボタン押下時の処理
     // キャンセルを通知する
-    // RankingSubmitStateがこれを受けてタイトルへ遷移する
     // ==================================================
     void OnCancelClicked()
     {
