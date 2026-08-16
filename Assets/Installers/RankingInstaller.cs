@@ -5,14 +5,13 @@ using VContainer.Unity;
 /// RankingInstaller.cs
 /// ランキング機能関連クラスをDI登録する
 /// 
-/// - IScoreApiClient・IScoreRepository・各Repository・UIをまとめる
 /// - 通信層→データ層→ViewModel層→UI層の順で登録する
 ///   → 依存関係の流れが一目でわかるようにした（引き継ぎやすさの向上）
 /// - DockerScoreApiClientとFakeScoreApiClientを切り替えるには
 ///   コメントアウトを変えるだけでよい（拡張性の向上）
 /// - サーバーURLはここで一元管理する
-/// - FallbackScoreRepositoryでAPI失敗時にLocalへフォールバックする
-///   → Docker未起動時でもランキング機能が動作する
+/// - 自己ベスト保存はResultManagerのPlayerPrefsに任せる
+///   → オンラインランキングと自己ベストは独立した設計にした
 /// - ランキング機能を別プロジェクトに移植する場合は
 ///   このInstallerごとコピーするだけでよい（引き継ぎやすさの向上）
 /// </summary>
@@ -32,15 +31,13 @@ public class RankingInstaller : IInstaller
 
         // データ層：スコアの保存・取得を担当する
         // ApiScoreRepository → Docker API経由
-        // LocalScoreRepository → PlayerPrefs経由
-        // FallbackScoreRepository → API失敗時にLocalへフォールバック
-        builder.Register<ApiScoreRepository>(Lifetime.Singleton);
-        builder.Register<LocalScoreRepository>(Lifetime.Singleton);
-        builder.Register<FallbackScoreRepository>(Lifetime.Singleton)
-            .As<IScoreRepository>(); // UI側はIScoreRepositoryだけを知ればよい
+        // 自己ベスト保存はResultManagerのPlayerPrefsに任せるため
+        // LocalScoreRepository・FallbackScoreRepositoryは不使用
+        builder.Register<ApiScoreRepository>(Lifetime.Singleton)
+            .As<IScoreRepository>();
 
         // ViewModel層：状態管理・データ取得のロジックを担当する
-        // RankingViewはViewModelを通してデータにアクセスする（直接Repository不使用）
+        // RankingView・RankingSubmitUIはViewModelを通してデータにアクセスする
         builder.Register<RankingViewModel>(Lifetime.Singleton);
 
         // UI層：ランキング機能のUIを担当する
