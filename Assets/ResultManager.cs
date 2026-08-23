@@ -58,8 +58,8 @@ public class ResultManager : MonoBehaviour
             PlayerPrefs.Save();
         }
 
-        _bestScoreText.text = "Best Score: " + bestScore;
-        _nowScoreText.text = "Now Score: " + currentScore;
+        _bestScoreText.text = "Best: " + bestScore;
+        _nowScoreText.text = "Now: " + currentScore;
     }
 
     // ==================================================

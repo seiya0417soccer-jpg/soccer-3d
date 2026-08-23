@@ -1,7 +1,6 @@
 using Cysharp.Threading.Tasks;
 using R3;
 using System.Threading;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using VContainer;
@@ -20,10 +19,10 @@ using VContainer;
 /// </summary>
 public class RankingSubmitUI : MonoBehaviour
 {
-    [SerializeField] private TMP_InputField _nameInputField; // 名前入力欄
+    [SerializeField] private InputField _nameInputField; // 名前入力欄
     [SerializeField] private Button _submitButton;           // 送信ボタン
     [SerializeField] private Button _cancelButton;           // キャンセルボタン
-    [SerializeField] private TextMeshProUGUI _statusText;    // 送信状態を表示するテキスト
+    [SerializeField] private Text _statusText;    // 送信状態を表示するテキスト
 
     // RankingViewModelを通してスコアを送信する（IScoreRepositoryを直接知らない）
     private RankingViewModel _viewModel;
