@@ -1,8 +1,8 @@
 using Cysharp.Threading.Tasks;
 using R3;
 using System.Threading;
-using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 using VContainer;
 
 /// <summary>
@@ -18,9 +18,9 @@ using VContainer;
 /// </summary>
 public class RankingView : MonoBehaviour
 {
-    [SerializeField] private Transform _entryContainer;   // エントリを並べる親オブジェクト
-    [SerializeField] private GameObject _entryPrefab;     // 1行分のエントリPrefab
-    [SerializeField] private TextMeshProUGUI _statusText; // 取得状態を表示するテキスト
+    [SerializeField] private Transform _entryContainer;  // エントリを並べる親オブジェクト
+    [SerializeField] private GameObject _entryPrefab;    // 1行分のエントリPrefab
+    [SerializeField] private Text _statusText;           // 取得状態を表示するテキスト
 
     // RankingViewModelを通してランキングを取得する
     // IScoreRepositoryを直接知らなくていい設計にした
@@ -42,7 +42,7 @@ public class RankingView : MonoBehaviour
     public void LoadAndDisplay(CancellationToken ct)
     {
         // ViewModelのStateを購読して表示を切り替える
-        // AddTo(this)でMonoBehaviour破棄時に自動で購読解除する
+        // AddTo(this)でMonoBehaviour破棄時に自動で購読解除する（メモリリーク防止）
         _viewModel.State
             .Subscribe(state => OnStateChanged(state))
             .AddTo(this);
@@ -89,7 +89,8 @@ public class RankingView : MonoBehaviour
         for (int i = 0; i < rankings.Count; i++)
         {
             var entry = Instantiate(_entryPrefab, _entryContainer);
-            var text = entry.GetComponent<TextMeshProUGUI>();
+            // レガシーTextコンポーネントを使用する
+            var text = entry.GetComponent<Text>();
             text.text = $"#{i + 1}  {rankings[i].Name}  {rankings[i].Score} kills";
         }
     }
