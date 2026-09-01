@@ -2546,7 +2546,7 @@ MonoBehaviour:
   _gameOverPanel: {fileID: 53445699}
   _finishPanel: {fileID: 78375959}
   _rankingSubmitPanel: {fileID: 935566642}
-  _rankingViewPanel: {fileID: 0}
+  _rankingViewPanel: {fileID: 744877891}
   _countdownText: {fileID: 822125706}
   _killCountObject: {fileID: 1885058801}
   _timerTextObject: {fileID: 1257889909}

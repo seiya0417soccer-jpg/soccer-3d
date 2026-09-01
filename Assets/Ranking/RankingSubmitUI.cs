@@ -15,14 +15,19 @@ using VContainer;
 /// - ViewModelのStateを購読して送信中・成功・失敗を可視化する
 /// - 送信完了・キャンセルをObservableで通知する
 ///   → GameFlowManagerを直接知らなくていい設計にした（疎結合）
+/// - 一度入力した名前をPlayerPrefsに保存して次回以降自動入力する
+///   → 毎回名前を入力する手間を省いてゲームのテンポを守る
 /// - otameshiで検証したViewModelをsoccer-3dに適用した
 /// </summary>
 public class RankingSubmitUI : MonoBehaviour
 {
     [SerializeField] private InputField _nameInputField; // 名前入力欄
-    [SerializeField] private Button _submitButton;           // 送信ボタン
-    [SerializeField] private Button _cancelButton;           // キャンセルボタン
-    [SerializeField] private Text _statusText;    // 送信状態を表示するテキスト
+    [SerializeField] private Button _submitButton;       // 送信ボタン
+    [SerializeField] private Button _cancelButton;       // キャンセルボタン
+    [SerializeField] private Text _statusText;           // 送信状態を表示するテキスト
+
+    // PlayerPrefsのキー定数（名前を保存・再利用する）
+    private const string PlayerNameKey = "PlayerName";
 
     // RankingViewModelを通してスコアを送信する（IScoreRepositoryを直接知らない）
     private RankingViewModel _viewModel;
@@ -59,12 +64,17 @@ public class RankingSubmitUI : MonoBehaviour
 
     // ==================================================
     // Start: ボタンにイベントを登録する
+    // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
     // ViewModelのStateを購読して表示を切り替える
     // ==================================================
     void Start()
     {
         _submitButton.onClick.AddListener(OnSubmitClicked);
         _cancelButton.onClick.AddListener(OnCancelClicked);
+
+        // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
+        // 初回は空文字なので何も表示されない
+        _nameInputField.text = PlayerPrefs.GetString(PlayerNameKey, "");
 
         // ViewModelのStateを購読して送信状態を可視化する
         // AddTo(this)でMonoBehaviour破棄時に自動で購読解除する（メモリリーク防止）
@@ -118,6 +128,7 @@ public class RankingSubmitUI : MonoBehaviour
 
     // ==================================================
     // SubmitAsync: ViewModelを通してスコアを送信する
+    // 送信成功時に名前をPlayerPrefsに保存して次回以降自動入力する
     // 送信処理・エラーハンドリングはViewModelが担当する
     // ==================================================
     private async UniTaskVoid SubmitAsync(CancellationToken ct)
@@ -133,6 +144,14 @@ public class RankingSubmitUI : MonoBehaviour
         // ViewModelを通して送信する
         // 状態管理・エラーハンドリングはViewModelが担当する
         await _viewModel.SubmitAsync(scoreData, ct);
+
+        // 送信成功時に名前を保存する（次回以降自動入力するため）
+        // SuccessStateはOnStateChangedで検知するため、ここではViewModel.Stateを確認する
+        if (_viewModel.State.Value is SuccessState)
+        {
+            PlayerPrefs.SetString(PlayerNameKey, playerName);
+            PlayerPrefs.Save();
+        }
     }
 
     // ==================================================
@@ -147,10 +166,11 @@ public class RankingSubmitUI : MonoBehaviour
     // ==================================================
     // ResetUI: UIをリセットする
     // RankingSubmitStateのEnterから呼ぶ
+    // 名前はリセットしない（前回の名前を残す）
     // ==================================================
     public void ResetUI()
     {
-        _nameInputField.text = "";
+        // 名前は前回の入力を引き継ぐためリセットしない
         _statusText.text = "";
         _submitButton.interactable = true;
         _cancelButton.interactable = true;
