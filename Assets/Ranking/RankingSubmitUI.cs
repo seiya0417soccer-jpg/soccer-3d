@@ -145,9 +145,9 @@ public class RankingSubmitUI : MonoBehaviour
         // 状態管理・エラーハンドリングはViewModelが担当する
         await _viewModel.SubmitAsync(scoreData, ct);
 
-        // 送信成功時に名前を保存する（次回以降自動入力するため）
-        // SuccessStateはOnStateChangedで検知するため、ここではViewModel.Stateを確認する
-        if (_viewModel.State.Value is SuccessState)
+        // 送信後にStateを確認して名前を保存する
+        // ErrorStateでなければ成功とみなして保存する
+        if (_viewModel.State.Value is not ErrorState)
         {
             PlayerPrefs.SetString(PlayerNameKey, playerName);
             PlayerPrefs.Save();

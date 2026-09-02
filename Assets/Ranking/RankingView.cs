@@ -83,13 +83,15 @@ public class RankingView : MonoBehaviour
 
     // ==================================================
     // DisplayRanking: ランキングをエントリとして表示する
+    // TOP5のみ表示する（それ以上は切り捨てる）
     // ==================================================
     private void DisplayRanking(System.Collections.Generic.List<PlayerScoreData> rankings)
     {
-        for (int i = 0; i < rankings.Count; i++)
+        // TOP5だけ表示する
+        int count = Mathf.Min(rankings.Count, 5);
+        for (int i = 0; i < count; i++)
         {
             var entry = Instantiate(_entryPrefab, _entryContainer);
-            // レガシーTextコンポーネントを使用する
             var text = entry.GetComponent<Text>();
             text.text = $"#{i + 1}  {rankings[i].Name}  {rankings[i].Score} kills";
         }
