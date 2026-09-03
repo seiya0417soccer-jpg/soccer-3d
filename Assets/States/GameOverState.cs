@@ -66,6 +66,7 @@ public class GameOverState : IGameState
     // ==================================================
     private void GoToResult()
     {
-        _gameFlowManager.ChangeState(new ResultState(_gameFlowManager));
+        // GoToResult()経由でリザルトへ遷移する
+        _gameFlowManager.GoToResult();
     }
 }

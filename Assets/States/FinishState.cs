@@ -37,8 +37,8 @@ public class FinishState : IGameState
         if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Return) ||
             UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.KeypadEnter))
         {
-            // リザルト状態へ遷移
-            _gameFlowManager.ChangeState(new ResultState(_gameFlowManager));
+            // GoToResult()経由でリザルトへ遷移する
+            _gameFlowManager.GoToResult();
         }
     }
 

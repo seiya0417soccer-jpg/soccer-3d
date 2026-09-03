@@ -253,6 +253,15 @@ public class GameFlowManager : MonoBehaviour
     }
 
     // ==================================================
+    // GoToResult: リザルト画面へ遷移する
+    // FinishState・GameOverState・RankingSubmitStateから呼ぶ
+    // リセット処理は行わず結果画面をそのまま表示する
+    // ==================================================
+    public void GoToResult()
+    {
+        ChangeState(new ResultState(this));
+    }
+    // ==================================================
     // LoadRanking: ランキングデータを取得して表示する
     // RankingViewStateのEnterから呼ぶ
     // ==================================================

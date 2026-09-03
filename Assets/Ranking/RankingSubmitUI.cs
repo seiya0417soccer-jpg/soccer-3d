@@ -15,19 +15,28 @@ using VContainer;
 /// - ViewModelのStateを購読して送信中・成功・失敗を可視化する
 /// - 送信完了・キャンセルをObservableで通知する
 ///   → GameFlowManagerを直接知らなくていい設計にした（疎結合）
+/// - 通信失敗時は最大3回までユーザーが再送できる
+///   → 3回失敗したらリザルト画面へ戻る（自己ベストで記録）
 /// - 一度入力した名前をPlayerPrefsに保存して次回以降自動入力する
 ///   → 毎回名前を入力する手間を省いてゲームのテンポを守る
 /// - otameshiで検証したViewModelをsoccer-3dに適用した
 /// </summary>
 public class RankingSubmitUI : MonoBehaviour
 {
-    [SerializeField] private InputField _nameInputField; // 名前入力欄
-    [SerializeField] private Button _submitButton;       // 送信ボタン
-    [SerializeField] private Button _cancelButton;       // キャンセルボタン
-    [SerializeField] private Text _statusText;           // 送信状態を表示するテキスト
+    [SerializeField] private InputField _nameInputField;     // 名前入力欄
+    [SerializeField] private Button _submitButton;           // 送信ボタン
+    [SerializeField] private Button _cancelButton;           // キャンセルボタン
+    [SerializeField] private Text _statusText;               // 送信状態を表示するテキスト
+    [SerializeField] private Text _submitButtonText;         // 送信ボタンのテキスト
 
     // PlayerPrefsのキー定数（名前を保存・再利用する）
     private const string PlayerNameKey = "PlayerName";
+
+    // 最大リトライ回数
+    private const int MaxRetryCount = 3;
+
+    // 現在の送信試行回数
+    private int _retryCount = 0;
 
     // RankingViewModelを通してスコアを送信する（IScoreRepositoryを直接知らない）
     private RankingViewModel _viewModel;
@@ -50,8 +59,14 @@ public class RankingSubmitUI : MonoBehaviour
     public Observable<Unit> OnCancelled => _onCancelled;
 
     // ==================================================
+    // 3回失敗時に発火するSubject
+    // RankingSubmitStateがこれを購読してリザルトへ戻る
+    // ==================================================
+    private readonly Subject<Unit> _onMaxRetryReached = new Subject<Unit>();
+    public Observable<Unit> OnMaxRetryReached => _onMaxRetryReached;
+
+    // ==================================================
     // Inject: VContainerから依存を注入される
-    // RankingViewModelを受け取る（IScoreRepositoryは受け取らない）
     // ==================================================
     [Inject]
     public void Construct(
@@ -65,7 +80,6 @@ public class RankingSubmitUI : MonoBehaviour
     // ==================================================
     // Start: ボタンにイベントを登録する
     // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
-    // ViewModelのStateを購読して表示を切り替える
     // ==================================================
     void Start()
     {
@@ -73,7 +87,6 @@ public class RankingSubmitUI : MonoBehaviour
         _cancelButton.onClick.AddListener(OnCancelClicked);
 
         // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
-        // 初回は空文字なので何も表示されない
         _nameInputField.text = PlayerPrefs.GetString(PlayerNameKey, "");
 
         // ViewModelのStateを購読して送信状態を可視化する
@@ -90,6 +103,7 @@ public class RankingSubmitUI : MonoBehaviour
     {
         _onSubmitCompleted.Dispose();
         _onCancelled.Dispose();
+        _onMaxRetryReached.Dispose();
     }
 
     // ==================================================
@@ -107,14 +121,30 @@ public class RankingSubmitUI : MonoBehaviour
         else if (state is SuccessState)
         {
             _statusText.text = "送信完了！";
-            // 送信完了を通知する
             _onSubmitCompleted.OnNext(Unit.Default);
         }
-        else if (state is ErrorState errorState)
+        else if (state is ErrorState)
         {
-            _statusText.text = $"送信失敗: {errorState.Message}";
-            _submitButton.interactable = true;
-            _cancelButton.interactable = true;
+            _retryCount++;
+
+            if (_retryCount < MaxRetryCount)
+            {
+                // まだリトライできる
+                _statusText.text = $"通信に失敗しました（{_retryCount}/{MaxRetryCount}）";
+                _submitButtonText.text = "もう一度送信";
+                _submitButton.interactable = true;
+                _cancelButton.interactable = true;
+            }
+            else
+            {
+                // 最大リトライ回数に達した
+                _statusText.text = "通信できないため自己ベストとして記録します\n>>ENTERでリザルトへ";
+                _submitButton.gameObject.SetActive(false);
+                _cancelButton.gameObject.SetActive(false);
+
+                // RankingSubmitStateに通知してEnter待ちに移行する
+                _onMaxRetryReached.OnNext(Unit.Default);
+            }
         }
     }
 
@@ -128,8 +158,7 @@ public class RankingSubmitUI : MonoBehaviour
 
     // ==================================================
     // SubmitAsync: ViewModelを通してスコアを送信する
-    // 送信成功時に名前をPlayerPrefsに保存して次回以降自動入力する
-    // 送信処理・エラーハンドリングはViewModelが担当する
+    // 送信後にStateを確認して名前を保存する
     // ==================================================
     private async UniTaskVoid SubmitAsync(CancellationToken ct)
     {
@@ -142,11 +171,9 @@ public class RankingSubmitUI : MonoBehaviour
         var scoreData = new PlayerScoreData(playerName, _scoreReader.Score);
 
         // ViewModelを通して送信する
-        // 状態管理・エラーハンドリングはViewModelが担当する
         await _viewModel.SubmitAsync(scoreData, ct);
 
-        // 送信後にStateを確認して名前を保存する
-        // ErrorStateでなければ成功とみなして保存する
+        // ErrorStateでなければ成功とみなして名前を保存する
         if (_viewModel.State.Value is not ErrorState)
         {
             PlayerPrefs.SetString(PlayerNameKey, playerName);
@@ -156,7 +183,6 @@ public class RankingSubmitUI : MonoBehaviour
 
     // ==================================================
     // OnCancelClicked: キャンセルボタン押下時の処理
-    // キャンセルを通知する
     // ==================================================
     void OnCancelClicked()
     {
@@ -170,8 +196,11 @@ public class RankingSubmitUI : MonoBehaviour
     // ==================================================
     public void ResetUI()
     {
-        // 名前は前回の入力を引き継ぐためリセットしない
+        _retryCount = 0;
         _statusText.text = "";
+        _submitButtonText.text = "送信";
+        _submitButton.gameObject.SetActive(true);
+        _cancelButton.gameObject.SetActive(true);
         _submitButton.interactable = true;
         _cancelButton.interactable = true;
     }
