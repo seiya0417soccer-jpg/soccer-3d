@@ -2706,6 +2706,7 @@ MonoBehaviour:
   _submitButton: {fileID: 843718095}
   _cancelButton: {fileID: 763770090}
   _statusText: {fileID: 763115735}
+  _submitButtonText: {fileID: 2126264795}
 --- !u!114 &935566644
 MonoBehaviour:
   m_ObjectHideFlags: 0
