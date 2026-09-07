@@ -19,7 +19,7 @@ using VContainer;
 /// - 送信完了・キャンセルをObservableで通知する
 ///   → GameFlowManagerを直接知らなくていい設計にした（疎結合）
 /// - 通信失敗時は最大3回までユーザーが再送できる
-///   → 3回失敗したらリザルト画面へ戻る（自己ベストで記録）
+///   → 3回失敗したらENTERテキストを表示してリザルト画面へ戻る
 /// - 一度入力した名前をPlayerPrefsに保存して次回以降自動入力する
 ///   → 毎回名前を入力する手間を省いてゲームのテンポを守る
 /// - otameshiで検証したViewModelをsoccer-3dに適用した
@@ -31,6 +31,7 @@ public class RankingSubmitUI : MonoBehaviour
     [SerializeField] private Button _cancelButton;           // キャンセルボタン
     [SerializeField] private Text _statusText;               // 送信状態を表示するテキスト
     [SerializeField] private Text _submitButtonText;         // 送信ボタンのテキスト
+    [SerializeField] private GameObject _pushEnterText;      // 3回失敗時に表示するENTERテキスト
 
     // PlayerPrefsのキー定数（名前を保存・再利用する）
     private const string PlayerNameKey = "PlayerName";
@@ -143,9 +144,10 @@ public class RankingSubmitUI : MonoBehaviour
             else
             {
                 // 最大リトライ回数に達した
-                _statusText.text = "通信できないため自己ベストとして記録します\n>>ENTERでリザルトへ";
+                _statusText.text = "通信できないため自己ベストとして記録します";
                 _submitButton.gameObject.SetActive(false);
                 _cancelButton.gameObject.SetActive(false);
+                _pushEnterText.SetActive(true);
 
                 // RankingSubmitStateに通知してEnter待ちに移行する
                 _onMaxRetryReached.OnNext(Unit.Default);
@@ -211,6 +213,7 @@ public class RankingSubmitUI : MonoBehaviour
         _cancelButton.gameObject.SetActive(true);
         _submitButton.interactable = true;
         _cancelButton.interactable = true;
+        _pushEnterText.SetActive(false);
 
         // 前回の購読を解除してから再購読する
         // RankingViewModelがSingletonのため前回のStateが残る可能性があるため
