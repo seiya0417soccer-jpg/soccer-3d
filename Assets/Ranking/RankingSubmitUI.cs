@@ -1,5 +1,6 @@
 using Cysharp.Threading.Tasks;
 using R3;
+using System;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,6 +14,8 @@ using VContainer;
 /// - RankingViewModelを通してスコアを送信する
 ///   → IScoreRepositoryを直接知らなくていい設計にした（責務分離）
 /// - ViewModelのStateを購読して送信中・成功・失敗を可視化する
+///   → 購読はResetUI()で行い、前回の購読を解除してから再購読する
+///   → RankingViewModelがSingletonのため前回のStateが残らないようにした
 /// - 送信完了・キャンセルをObservableで通知する
 ///   → GameFlowManagerを直接知らなくていい設計にした（疎結合）
 /// - 通信失敗時は最大3回までユーザーが再送できる
@@ -44,9 +47,14 @@ public class RankingSubmitUI : MonoBehaviour
     // IScoreReaderを通して現在のスコアを読み取る
     private IScoreReader _scoreReader;
 
+    // State購読のDisposable
+    // ResetUI()で前回の購読を解除して再購読する
+    private IDisposable _stateDisposable;
+
     // ==================================================
     // 送信完了時に発火するSubject
     // RankingSubmitStateがこれを購読してRankingViewStateへ遷移する
+    // 発火する権利はRankingSubmitUIだけが持ち外部にはObservableとして公開する
     // ==================================================
     private readonly Subject<Unit> _onSubmitCompleted = new Subject<Unit>();
     public Observable<Unit> OnSubmitCompleted => _onSubmitCompleted;
@@ -60,7 +68,7 @@ public class RankingSubmitUI : MonoBehaviour
 
     // ==================================================
     // 3回失敗時に発火するSubject
-    // RankingSubmitStateがこれを購読してリザルトへ戻る
+    // RankingSubmitStateがこれを購読してEnter待ちに移行する
     // ==================================================
     private readonly Subject<Unit> _onMaxRetryReached = new Subject<Unit>();
     public Observable<Unit> OnMaxRetryReached => _onMaxRetryReached;
@@ -80,6 +88,7 @@ public class RankingSubmitUI : MonoBehaviour
     // ==================================================
     // Start: ボタンにイベントを登録する
     // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
+    // State購読はResetUI()で行うためここでは行わない
     // ==================================================
     void Start()
     {
@@ -87,23 +96,19 @@ public class RankingSubmitUI : MonoBehaviour
         _cancelButton.onClick.AddListener(OnCancelClicked);
 
         // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
+        // 初回は空文字なので何も表示されない
         _nameInputField.text = PlayerPrefs.GetString(PlayerNameKey, "");
-
-        // ViewModelのStateを購読して送信状態を可視化する
-        // AddTo(this)でMonoBehaviour破棄時に自動で購読解除する（メモリリーク防止）
-        _viewModel.State
-            .Subscribe(state => OnStateChanged(state))
-            .AddTo(this);
     }
 
     // ==================================================
-    // OnDestroy: Subjectを破棄する
+    // OnDestroy: SubjectとDisposableを破棄する
     // ==================================================
     void OnDestroy()
     {
         _onSubmitCompleted.Dispose();
         _onCancelled.Dispose();
         _onMaxRetryReached.Dispose();
+        _stateDisposable?.Dispose();
     }
 
     // ==================================================
@@ -171,6 +176,7 @@ public class RankingSubmitUI : MonoBehaviour
         var scoreData = new PlayerScoreData(playerName, _scoreReader.Score);
 
         // ViewModelを通して送信する
+        // 状態管理・エラーハンドリングはViewModelが担当する
         await _viewModel.SubmitAsync(scoreData, ct);
 
         // ErrorStateでなければ成功とみなして名前を保存する
@@ -193,6 +199,8 @@ public class RankingSubmitUI : MonoBehaviour
     // ResetUI: UIをリセットする
     // RankingSubmitStateのEnterから呼ぶ
     // 名前はリセットしない（前回の名前を残す）
+    // State購読をここで行うことでSingletonのViewModelの
+    // 前回のStateが残らないようにする（疎結合を維持）
     // ==================================================
     public void ResetUI()
     {
@@ -203,5 +211,12 @@ public class RankingSubmitUI : MonoBehaviour
         _cancelButton.gameObject.SetActive(true);
         _submitButton.interactable = true;
         _cancelButton.interactable = true;
+
+        // 前回の購読を解除してから再購読する
+        // RankingViewModelがSingletonのため前回のStateが残る可能性があるため
+        _stateDisposable?.Dispose();
+        _stateDisposable = _viewModel.State
+            .Subscribe(state => OnStateChanged(state))
+            .AddTo(this);
     }
 }
