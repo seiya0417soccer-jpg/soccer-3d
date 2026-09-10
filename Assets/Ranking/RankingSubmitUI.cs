@@ -19,8 +19,9 @@ using VContainer;
 /// - 送信完了・キャンセルをObservableで通知する
 ///   → GameFlowManagerを直接知らなくていい設計にした（疎結合）
 /// - 通信失敗時は最大3回までユーザーが再送できる
-///   → 3回失敗したらENTERテキストを表示してリザルト画面へ戻る
-/// - 一度入力した名前をPlayerPrefsに保存して次回以降自動入力する
+///   → 3回失敗したらENTERテキストを表示してリザルトへ戻る
+/// - 一度入力した名前をGameConstants.PlayerNameKeyで保存して次回以降自動入力する
+///   → 定数をGameConstantsで一本管理することで修正漏れを防ぐ
 ///   → 毎回名前を入力する手間を省いてゲームのテンポを守る
 /// - otameshiで検証したViewModelをsoccer-3dに適用した
 /// </summary>
@@ -32,9 +33,6 @@ public class RankingSubmitUI : MonoBehaviour
     [SerializeField] private Text _statusText;               // 送信状態を表示するテキスト
     [SerializeField] private Text _submitButtonText;         // 送信ボタンのテキスト
     [SerializeField] private GameObject _pushEnterText;      // 3回失敗時に表示するENTERテキスト
-
-    // PlayerPrefsのキー定数（名前を保存・再利用する）
-    private const string PlayerNameKey = "PlayerName";
 
     // 最大リトライ回数
     private const int MaxRetryCount = 3;
@@ -89,6 +87,7 @@ public class RankingSubmitUI : MonoBehaviour
     // ==================================================
     // Start: ボタンにイベントを登録する
     // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
+    // GameConstants.PlayerNameKeyで定数を一本管理する
     // State購読はResetUI()で行うためここでは行わない
     // ==================================================
     void Start()
@@ -98,7 +97,7 @@ public class RankingSubmitUI : MonoBehaviour
 
         // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
         // 初回は空文字なので何も表示されない
-        _nameInputField.text = PlayerPrefs.GetString(PlayerNameKey, "");
+        _nameInputField.text = PlayerPrefs.GetString(GameConstants.PlayerNameKey, "");
     }
 
     // ==================================================
@@ -166,6 +165,7 @@ public class RankingSubmitUI : MonoBehaviour
     // ==================================================
     // SubmitAsync: ViewModelを通してスコアを送信する
     // 送信後にStateを確認して名前を保存する
+    // GameConstants.PlayerNameKeyで定数を一本管理する
     // ==================================================
     private async UniTaskVoid SubmitAsync(CancellationToken ct)
     {
@@ -184,7 +184,7 @@ public class RankingSubmitUI : MonoBehaviour
         // ErrorStateでなければ成功とみなして名前を保存する
         if (_viewModel.State.Value is not ErrorState)
         {
-            PlayerPrefs.SetString(PlayerNameKey, playerName);
+            PlayerPrefs.SetString(GameConstants.PlayerNameKey, playerName);
             PlayerPrefs.Save();
         }
     }
@@ -195,6 +195,18 @@ public class RankingSubmitUI : MonoBehaviour
     void OnCancelClicked()
     {
         _onCancelled.OnNext(Unit.Default);
+    }
+
+    // ==================================================
+    // ClearName: 名前入力欄をクリアする
+    // 名前クリアボタンから呼ぶ
+    // InputFieldとPlayerPrefsの両方をクリアする
+    // ==================================================
+    public void ClearName()
+    {
+        _nameInputField.text = "";
+        PlayerPrefs.DeleteKey(GameConstants.PlayerNameKey);
+        PlayerPrefs.Save();
     }
 
     // ==================================================
