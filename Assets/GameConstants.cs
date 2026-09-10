@@ -11,8 +11,13 @@ public static class GameConstants
 {
     // ==================================================
     // PlayerPrefsキー定数
-    // ResultManager・ResetBestScoreManagerで共通して使う
     // ここを変えるだけで全箇所に反映される
     // ==================================================
+
+    // ResultManager・ResetBestScoreManagerで共通して使う
     public const string BestScoreKey = "BestScore";
+
+    // RankingSubmitUI・ResetBestScoreManagerで共通して使う
+    // 自己ベスト削除時に名前もリセットするためここで一本管理する
+    public const string PlayerNameKey = "PlayerName";
 }
