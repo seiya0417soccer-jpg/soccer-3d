@@ -33,6 +33,7 @@ public class RankingSubmitUI : MonoBehaviour
     [SerializeField] private Text _statusText;               // 送信状態を表示するテキスト
     [SerializeField] private Text _submitButtonText;         // 送信ボタンのテキスト
     [SerializeField] private GameObject _pushEnterText;      // 3回失敗時に表示するENTERテキスト
+    [SerializeField] private Button _clearNameButton;        // 名前削除ボタン
 
     // 最大リトライ回数
     private const int MaxRetryCount = 3;
@@ -94,6 +95,7 @@ public class RankingSubmitUI : MonoBehaviour
     {
         _submitButton.onClick.AddListener(OnSubmitClicked);
         _cancelButton.onClick.AddListener(OnCancelClicked);
+        _clearNameButton.onClick.AddListener(ClearName);
 
         // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
         // 初回は空文字なので何も表示されない
