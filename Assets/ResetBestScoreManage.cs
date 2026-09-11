@@ -6,10 +6,11 @@ using UnityEngine.UI;
 /// タイトル画面のベストスコアリセット機能
 /// 
 /// - リセットボタン押下で確認パネルを表示する（誤操作防止のため2段階確認にした）
-/// - DeleteButton → PlayerPrefsのベストスコアを削除して確認パネルを閉じる
+/// - DeleteButton → PlayerPrefsのベストスコアと名前を削除して確認パネルを閉じる
 /// - IIEButton → 確認パネルを閉じるだけ（削除しない）
-/// - BestScoreKeyはGameConstantsで一本管理する
-///   （ResultManagerと同じキーを使うため定数の重複を防ぐ）
+/// - BestScoreKey・PlayerNameKeyはGameConstantsで一本管理する
+///   → 自己ベストをリセットする時に名前履歴も一緒にリセットする
+///   → 「ゲームの記録をリセットする」という意図に沿った設計にした
 /// </summary>
 public class ResetBestScoreManager : MonoBehaviour
 {
@@ -45,15 +46,22 @@ public class ResetBestScoreManager : MonoBehaviour
 
     // ==================================================
     // OnDeleteClicked: 削除確認ボタン（はい）押下
-    // GameConstantsのキーでPlayerPrefsからベストスコアを削除する
+    // ベストスコアと名前履歴を一緒に削除する
+    // 「ゲームの記録をリセットする」という意図に沿って
+    // 関連するPlayerPrefsキーを全てクリアする
     // ==================================================
     void OnDeleteClicked()
     {
-        // GameConstants.BestScoreKeyで一本管理（ResultManagerと同じキーを使う）
+        // ベストスコアを削除する
         PlayerPrefs.DeleteKey(GameConstants.BestScoreKey);
+
+        // 名前履歴も削除する
+        // 自己ベストをリセットする時は名前履歴もリセットする方が自然なため
+        PlayerPrefs.DeleteKey(GameConstants.PlayerNameKey);
+
         PlayerPrefs.Save();
         _checkPanel.SetActive(false);
-        Debug.Log("ベストスコアをリセットしました");
+        Debug.Log("ベストスコアと名前履歴をリセットしました");
     }
 
     // ==================================================
