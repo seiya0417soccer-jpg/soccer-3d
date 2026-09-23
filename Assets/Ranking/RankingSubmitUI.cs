@@ -23,6 +23,8 @@ using VContainer;
 /// - 一度入力した名前をGameConstants.PlayerNameKeyで保存して次回以降自動入力する
 ///   → 定数をGameConstantsで一本管理することで修正漏れを防ぐ
 ///   → 毎回名前を入力する手間を省いてゲームのテンポを守る
+/// - 名前入力欄はResetUI()で毎回PlayerPrefsから読み直す
+///   → ゲーム起動中に自己ベストをリセットしても名前が反映される
 /// - otameshiで検証したViewModelをsoccer-3dに適用した
 /// </summary>
 public class RankingSubmitUI : MonoBehaviour
@@ -87,19 +89,14 @@ public class RankingSubmitUI : MonoBehaviour
 
     // ==================================================
     // Start: ボタンにイベントを登録する
-    // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
-    // GameConstants.PlayerNameKeyで定数を一本管理する
-    // State購読はResetUI()で行うためここでは行わない
+    // 名前の初期表示はResetUI()側で毎回行うためここでは行わない
+    // State購読もResetUI()で行う
     // ==================================================
     void Start()
     {
         _submitButton.onClick.AddListener(OnSubmitClicked);
         _cancelButton.onClick.AddListener(OnCancelClicked);
         _clearNameButton.onClick.AddListener(ClearName);
-
-        // 前回入力した名前をPlayerPrefsから取得してInputFieldに設定する
-        // 初回は空文字なので何も表示されない
-        _nameInputField.text = PlayerPrefs.GetString(GameConstants.PlayerNameKey, "");
     }
 
     // ==================================================
@@ -214,8 +211,12 @@ public class RankingSubmitUI : MonoBehaviour
     // ==================================================
     // ResetUI: UIをリセットする
     // RankingSubmitStateのEnterから呼ぶ
-    // 名前はリセットしない（前回の名前を残す）
-    // State購読をここで行うことでSingletonのViewModelの
+    // 
+    // 名前はPlayerPrefsから毎回読み直す
+    // → ゲーム起動中に自己ベストをリセットした場合でも
+    //   最新の状態（名前削除済み）が反映されるようにする
+    // 
+    // State購読もここで行うことでSingletonのViewModelの
     // 前回のStateが残らないようにする（疎結合を維持）
     // ==================================================
     public void ResetUI()
@@ -228,6 +229,10 @@ public class RankingSubmitUI : MonoBehaviour
         _submitButton.interactable = true;
         _cancelButton.interactable = true;
         _pushEnterText.SetActive(false);
+
+        // 毎回PlayerPrefsから名前を読み直す
+        // 自己ベスト削除時に名前履歴も削除されるため起動中でも反映される
+        _nameInputField.text = PlayerPrefs.GetString(GameConstants.PlayerNameKey, "");
 
         // 前回の購読を解除してから再購読する
         // RankingViewModelがSingletonのため前回のStateが残る可能性があるため
