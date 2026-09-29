@@ -1,5 +1,6 @@
 using Cysharp.Threading.Tasks;
 using R3;
+using System;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,6 +14,12 @@ using VContainer;
 ///   → IScoreRepositoryを直接知らなくていい設計にした（責務分離）
 /// - RankingViewModelのStateを購読して表示を切り替える
 ///   → Loading・Success・Errorを可視化する
+/// - LoadAndDisplay()を呼ぶたびに前回の購読を解除して再購読する
+///   → RankingViewはパネル非表示のままMonoBehaviourとして生存し続けるため
+///     何度もランキング画面を開くと購読が累積するライフサイクル上の問題があった
+/// - 購読の管理はDisposableで明示的に行う
+///   → AddTo(this)と併用すると責務が二重になるため使わず、
+///     OnDestroy()での明示Disposeに一本化した
 /// - otameshiで検証したViewModel層をsoccer-3dに適用した
 /// - エントリはPrefabを生成して表示する
 /// </summary>
@@ -26,6 +33,12 @@ public class RankingView : MonoBehaviour
     // IScoreRepositoryを直接知らなくていい設計にした
     private RankingViewModel _viewModel;
 
+    // State・Rankings購読のDisposable
+    // LoadAndDisplay()呼び出しごとに前回の購読を解除して再購読する
+    // OnDestroy()で明示的に破棄する（AddTo(this)は使わず一本化）
+    private IDisposable _stateDisposable;
+    private IDisposable _rankingsDisposable;
+
     // ==================================================
     // Inject: VContainerから依存を注入される
     // ==================================================
@@ -36,26 +49,40 @@ public class RankingView : MonoBehaviour
     }
 
     // ==================================================
+    // OnDestroy: 購読を明示的に破棄する
+    // ==================================================
+    void OnDestroy()
+    {
+        _stateDisposable?.Dispose();
+        _rankingsDisposable?.Dispose();
+    }
+
+    // ==================================================
     // LoadAndDisplay: ランキングを取得して表示する
     // RankingViewStateのEnter経由でGameFlowManagerから呼ぶ
+    // 
+    // RankingViewはパネル非表示のまま破棄されずに残るため
+    // 呼ばれるたびに前回の購読を解除してから再購読する
+    // （解除しないと画面を開くたびに購読が積み重なってしまう）
     // ==================================================
     public void LoadAndDisplay(CancellationToken ct)
     {
+        // 前回の購読を解除してから再購読する
+        _stateDisposable?.Dispose();
+        _rankingsDisposable?.Dispose();
+
         // ViewModelのStateを購読して表示を切り替える
-        // AddTo(this)でMonoBehaviour破棄時に自動で購読解除する（メモリリーク防止）
-        _viewModel.State
-            .Subscribe(state => OnStateChanged(state))
-            .AddTo(this);
+        _stateDisposable = _viewModel.State
+            .Subscribe(state => OnStateChanged(state));
 
         // ViewModelのRankingsを購読してエントリを表示する
-        _viewModel.Rankings
+        _rankingsDisposable = _viewModel.Rankings
             .Subscribe(rankings =>
             {
                 if (rankings == null) return;
                 ClearEntries();
                 DisplayRanking(rankings);
-            })
-            .AddTo(this);
+            });
 
         // ランキングを取得する
         _viewModel.LoadAsync(ct).Forget();
