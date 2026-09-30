@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 785b9df452873cb4b9ad430dca301d97, type: 3}
   m_Name: YushaSettingSO
   m_EditorClassIdentifier: 
-  _defaultSpeed: 2
+  _defaultSpeed: 1.2
   _attackDistance: 2.5
   _attackDelay: 0.3
