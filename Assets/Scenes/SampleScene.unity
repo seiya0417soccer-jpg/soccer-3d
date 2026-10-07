@@ -781,7 +781,7 @@ GameObject:
   m_Component:
   - component: {fileID: 303611631}
   m_Layer: 0
-  m_Name: =======LEFT=======
+  m_Name: ======BATTLE======
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4135,7 +4135,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1123603423}
   m_Layer: 0
-  m_Name: =======RIGHT=======
+  m_Name: ======PUZZLE======
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
