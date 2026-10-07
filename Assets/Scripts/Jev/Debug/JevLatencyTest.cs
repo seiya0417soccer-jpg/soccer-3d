@@ -50,7 +50,7 @@ public class JevLatencyTest : MonoBehaviour
     private async UniTask MeasureLatencyAsync(JevClient client)
     {
         string state =
-            "テトリス型パズル。列の高さ: [3,3,4,2,0,0,1,5,5,2,1,0,0]。" +
+            "落下型パズル。列の高さ: [3,3,4,2,0,0,1,5,5,2,1,0,0]。" +
             "現在のピース: L字型。";
 
         string instructions =
@@ -105,7 +105,7 @@ public class JevLatencyTest : MonoBehaviour
     {
         // 左側は低く、右端3列(10,11,12)だけ高い
         string state =
-            "テトリス型パズル。盤面は13列。" +
+            "落下型パズル。盤面は13列。" +
             "列の高さを左から右の順に並べると [0,0,0,0,0,0,0,0,0,0,5,5,5]。" +
             "現在のピース: I字（長さ4の棒）。";
 
