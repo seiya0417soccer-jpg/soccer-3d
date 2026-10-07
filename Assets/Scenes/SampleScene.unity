@@ -3241,8 +3241,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   offsetX: 100
   offsetY: 0
-  puzzleFieldSO: {fileID: 0}
-  cameraSettingSO: {fileID: 0}
+  puzzleFieldSO: {fileID: 11400000, guid: 22cdb68759614e24e85f15eeb4626c13, type: 2}
+  cameraSettingSO: {fileID: 11400000, guid: d422c6c59ad102b4493aea2b6270d381, type: 2}
 --- !u!1 &963194225
 GameObject:
   m_ObjectHideFlags: 0
