@@ -12,9 +12,13 @@ public class PuzzleInstaller : IInstaller
     public void Install(IContainerBuilder builder)
     {
         builder.RegisterComponentInHierarchy<DropPuzzleBattle>()
-    .AsSelf()
-    .As<IPuzzleField>()
-    .As<IPuzzleAutomationPort>();
+            .AsSelf()
+            .As<IPuzzleField>()
+            .As<IPuzzleAutomationPort>();
+
         builder.RegisterComponentInHierarchy<DropLogicExtension>();
+
+        // Jev‚É‚æ‚é©“®ƒvƒŒƒCƒ„[‚ğ“o˜^
+        builder.RegisterComponentInHierarchy<JevPuzzleAutoPlayer>();
     }
 }
