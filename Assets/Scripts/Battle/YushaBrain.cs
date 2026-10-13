@@ -13,6 +13,8 @@ using R3;
 /// - 移動中はRunアニメーション・攻撃時はAttackアニメーション
 /// - バフ・デバフによる速度変更
 /// - デバフ中はUpdate処理をスキップしてアニメーションが上書きされないようにする
+/// - 攻撃待機中はNavMeshAgentを止める
+///   → 高速時に敵を通り過ぎてから倒れる見た目を防ぐ
 /// - もう一度プレイ時にResetPosition()で初期位置に戻す
 /// - IScoreWriterを通してスコアを加算する（ScoreManager直接参照をやめる）
 /// - 敵を倒した時にCameraFollowのShakeCamera()を呼んで画面を揺らす
@@ -161,10 +163,19 @@ public class YushaBrain : MonoBehaviour, IBattleField, ICameraShakeable
     // DestroyAfterAnim: 攻撃モーションの頭出し後にDestroyする
     // attackDelay秒待ってから敵を消去してスコア加算する
     // EnemySpawnerに通知して次の敵をスポーンさせる
+    // 
+    // 待機中はNavMeshAgentを止める
+    // → 高速時に待機中の0.3秒で敵を通り過ぎてしまうのを防ぐ
+    // 再開(isStopped=false)は敵の有無に関わらず必ず行う
+    // → if(enemy != null)の中に置くと、敵が先に消えた場合に止まりっぱなしになる
     // ==================================================
     IEnumerator DestroyAfterAnim(GameObject enemy)
     {
         _isAttacking = true;
+
+        // 攻撃待機中は移動を止める
+        _agent.isStopped = true;
+
         yield return new WaitForSeconds(_yushaSettingSO.AttackDelay);
 
         if (enemy != null)
@@ -182,6 +193,9 @@ public class YushaBrain : MonoBehaviour, IBattleField, ICameraShakeable
             // IBattleField実装：敵を倒したことをSubjectで通知（疎結合）
             _onEnemyDefeated.OnNext(Unit.Default);
         }
+
+        // 敵の有無に関わらず必ず移動を再開する
+        _agent.isStopped = false;
 
         _isAttacking = false;
         _animator?.SetBool(ParamIsMoving, true); // 攻撃後にRunに戻す
@@ -300,11 +314,14 @@ public class YushaBrain : MonoBehaviour, IBattleField, ICameraShakeable
     // ==================================================
     // IBattleField実装：初期位置にリセットする
     // GameFlowManagerから呼ぶ
+    // 攻撃待機中に止めた移動もここで必ず再開する
+    // → リセット時にコルーチンが途中で終わっても止まりっぱなしにならない
     // ==================================================
     public void ResetPosition()
     {
         _agent.Warp(new Vector3(0, 1, 0));
         _agent.speed = _yushaSettingSO.DefaultSpeed;
+        _agent.isStopped = false;                      // 攻撃待機で止めた移動を再開
         _isAttacking = false;
         _isDebuffActive = false;                       // デバフフラグもリセット
         _animator?.SetBool(ParamIsMoving, false);
