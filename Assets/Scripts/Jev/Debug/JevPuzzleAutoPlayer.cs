@@ -113,6 +113,16 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
             return;
         }
 
+        if (_settings == null)
+        {
+            Debug.LogError(
+                "[Jev AutoPlayer] JevAutoPlaySettingsSOÇ™ê›íËÇ≥ÇÍÇƒÇ¢Ç‹ÇπÇÒÅB");
+            return;
+        }
+
+        _puzzleAutomationPort.SetAutomationFallStepInterval(
+            _settings.FallStepInterval);
+
         _loopActive = true;
         _isRunning = true;
 

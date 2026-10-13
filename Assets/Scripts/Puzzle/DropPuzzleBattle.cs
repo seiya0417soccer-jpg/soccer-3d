@@ -102,6 +102,9 @@ public class DropPuzzleBattle :
     // Jevなどが判断している間は通常操作を停止する
     private bool isAutomationDecisionActive = false;
 
+    // Jev自動プレイ専用の1マスごとの落下時間（秒）
+    private float automationFallStepInterval = 1f;
+
     // CrossBombになるブロックインデックスの確率
     [SerializeField, Range(0f, 1f)] private float crossBombChance = 0.1f;
 
@@ -930,5 +933,14 @@ public class DropPuzzleBattle :
     public void EndDecision()
     {
         isAutomationDecisionActive = false;
+    }
+
+    // ==================================================
+    // 自動プレイ時の落下時間を設定する
+    // 通常プレイの fallInterval には影響させない
+    // ==================================================
+    public void SetAutomationFallStepInterval(float secondsPerCell)
+    {
+        automationFallStepInterval = Mathf.Max(0.05f, secondsPerCell);
     }
 }

@@ -13,6 +13,11 @@ public interface IPuzzleAutomationPort
     bool TryBeginDecision(out PuzzleAutomationSnapshot snapshot);
 
     /// <summary>
+    /// 自動プレイ時の1マスごとの落下時間を設定する。
+    /// </summary>
+    void SetAutomationFallStepInterval(float secondsPerCell);
+
+    /// <summary>
     /// 選択された配置を再検証して実行する。
     /// </summary>
     bool TryApplyPlacement(PuzzlePlacementCandidate candidate);
