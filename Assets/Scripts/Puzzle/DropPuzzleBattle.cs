@@ -1,8 +1,7 @@
-﻿using System.Collections;
+﻿using R3;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using R3;
-using VContainer;
 
 /// <summary>
 /// DropPuzzleBattle.cs
@@ -99,6 +98,9 @@ public class DropPuzzleBattle :
     // その他制御フラグ
     private bool skipDestroyedNotification = false; // ブロック消去通知をスキップするフラグ
     private int forcedNextPieceType = -1;           // 次のピース種別を強制指定（-1=通常）
+
+    // Jevなどが判断している間は通常操作を停止する
+    private bool isAutomationDecisionActive = false;
 
     // CrossBombになるブロックインデックスの確率
     [SerializeField, Range(0f, 1f)] private float crossBombChance = 0.1f;
@@ -200,6 +202,14 @@ public class DropPuzzleBattle :
     // ==================================================
     void Update()
     {
+        // 自動プレイの判断中は落下と手動操作を停止する
+        // 描画は続ける
+        if (isAutomationDecisionActive)
+        {
+            Draw();
+            return;
+        }
+
         fallTimer += Time.deltaTime;
 
         // Sキー押しっぱなしで高速落下
@@ -769,19 +779,24 @@ public class DropPuzzleBattle :
             yield return new WaitForSeconds(interval);
         }
     }
-    // 自動プレイの判断開始（仮実装）
+
     // 自動プレイの判断開始
     public bool TryBeginDecision(out PuzzleAutomationSnapshot snapshot)
     {
         snapshot = null;
 
-        // 盤面や現在のピースがまだ初期化されていない場合は失敗
-        if (field == null || currentShape == null)
+        // すでに判断中、または盤面が操作できない状態なら開始しない
+        if (isAutomationDecisionActive ||
+            isProcessingIslands ||
+            !enabled ||
+            field == null ||
+            currentShape == null ||
+            Time.timeScale == 0f)
         {
             return false;
         }
 
-        // 盤面の占有状態を bool 配列に変換する
+        // 現在の盤面をコピーする
         bool[,] occupied = new bool[hight, wide];
 
         for (int y = 0; y < hight; y++)
@@ -792,7 +807,7 @@ public class DropPuzzleBattle :
             }
         }
 
-        // 現在の盤面とピース情報からスナップショットを作成
+        // 判断開始時点の盤面とピースを保存する
         snapshot = new PuzzleAutomationSnapshot(
             wide,
             hight,
@@ -801,6 +816,9 @@ public class DropPuzzleBattle :
             currentShape,
             occupied
         );
+
+        // 通常の落下と操作を停止する
+        isAutomationDecisionActive = true;
 
         return true;
     }
@@ -811,8 +829,9 @@ public class DropPuzzleBattle :
         return false;
     }
 
-    // 自動プレイの判断終了（仮実装）
+    // 自動プレイの判断終了
     public void EndDecision()
     {
+        isAutomationDecisionActive = false;
     }
 }
