@@ -17,7 +17,10 @@ using VContainer;
 /// - ゲームオーバー検出→GameFlowManagerへ通知
 /// - IPuzzleFieldを実装してバトル側との疎結合を実現（R3）
 /// </summary>
-public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
+public class DropPuzzleBattle :
+    MonoBehaviour,
+    IPuzzleField,
+    IPuzzleAutomationPort
 {
     // ==================================================
     // BlockType enum: フィールド上のブロック種別
@@ -765,5 +768,22 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
 
             yield return new WaitForSeconds(interval);
         }
+    }
+    // 自動プレイの判断開始（仮実装）
+    public bool TryBeginDecision(out PuzzleAutomationSnapshot snapshot)
+    {
+        snapshot = null;
+        return false;
+    }
+
+    // 選択された配置の実行（仮実装）
+    public bool TryApplyPlacement(PuzzlePlacementCandidate candidate)
+    {
+        return false;
+    }
+
+    // 自動プレイの判断終了（仮実装）
+    public void EndDecision()
+    {
     }
 }
