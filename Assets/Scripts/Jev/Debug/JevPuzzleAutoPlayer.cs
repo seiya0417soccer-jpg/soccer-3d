@@ -26,7 +26,10 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
 
     [SerializeField]
     [Tooltip("自動プレイの開始・停止に使用するキー")]
-    private KeyCode _toggleKey = KeyCode.F8;
+    private KeyCode _toggleKey = KeyCode.J;
+
+    [Header("Jev自動プレイ設定")]
+    [SerializeField] private JevAutoPlaySettingsSO _settings;
 
     // 判断を開始できない場合の再確認間隔
     private const int IdleDelayMilliseconds = 250;
@@ -72,7 +75,7 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
 
     private void Update()
     {
-        // F8キーで自動プレイを開始・停止する
+        // Jキーで自動プレイを開始・停止する
         if (!Input.GetKeyDown(_toggleKey))
             return;
 
