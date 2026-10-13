@@ -11,7 +11,10 @@ public class PuzzleInstaller : IInstaller
 {
     public void Install(IContainerBuilder builder)
     {
-        builder.RegisterComponentInHierarchy<DropPuzzleBattle>().AsSelf().As<IPuzzleField>();
+        builder.RegisterComponentInHierarchy<DropPuzzleBattle>()
+    .AsSelf()
+    .As<IPuzzleField>()
+    .As<IPuzzleAutomationPort>();
         builder.RegisterComponentInHierarchy<DropLogicExtension>();
     }
 }
