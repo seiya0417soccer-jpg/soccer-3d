@@ -780,7 +780,9 @@ public class DropPuzzleBattle :
         }
     }
 
+    // ==================================================
     // 自動プレイの判断開始
+    // ==================================================
     public bool TryBeginDecision(out PuzzleAutomationSnapshot snapshot)
     {
         snapshot = null;
@@ -823,13 +825,108 @@ public class DropPuzzleBattle :
         return true;
     }
 
-    // 選択された配置の実行（仮実装）
+    // ==================================================
+    /// 選択された配置を検証して実行する。
+    /// 既存の移動・固定・消去処理を利用する。
+    // ==================================================
     public bool TryApplyPlacement(PuzzlePlacementCandidate candidate)
     {
-        return false;
+        // 判断中でなければ配置を実行しない
+        if (!isAutomationDecisionActive ||
+            candidate == null ||
+            isProcessingIslands ||
+            !enabled ||
+            field == null ||
+            currentShape == null ||
+            Time.timeScale == 0f)
+        {
+            return false;
+        }
+
+        // 不正な回転回数を拒否する
+        if (candidate.Rotation < 0 || candidate.Rotation > 3)
+        {
+            return false;
+        }
+
+        // 現在の形状をコピーして、指定回数だけ回転する
+        Vector2Int[] rotatedShape =
+            (Vector2Int[])currentShape.Clone();
+
+        for (int rotation = 0; rotation < candidate.Rotation; rotation++)
+        {
+            Vector2Int[] rotated =
+                new Vector2Int[rotatedShape.Length];
+
+            for (int i = 0; i < rotatedShape.Length; i++)
+            {
+                rotated[i] = new Vector2Int(
+                    -rotatedShape[i].y,
+                    rotatedShape[i].x);
+            }
+
+            rotatedShape = rotated;
+        }
+
+        // 候補が指定する着地位置
+        Vector2Int landingPosition = new Vector2Int(
+            candidate.AnchorX,
+            candidate.LandingY);
+
+        // 候補の左端列と基準座標が一致するか検証
+        int minX = rotatedShape[0].x;
+
+        foreach (Vector2Int block in rotatedShape)
+        {
+            minX = Mathf.Min(minX, block.x);
+        }
+
+        if (candidate.AnchorX + minX != candidate.LeftmostColumn)
+        {
+            return false;
+        }
+
+        // 最終配置が盤面内に完全に収まるか確認
+        foreach (Vector2Int block in rotatedShape)
+        {
+            Vector2Int cell = landingPosition + block;
+
+            if (cell.x < 0 || cell.x >= wide ||
+                cell.y < 0 || cell.y >= hight)
+            {
+                return false;
+            }
+        }
+
+        // 配置場所が空いているか確認
+        if (!IsValidPosition(landingPosition, rotatedShape))
+        {
+            return false;
+        }
+
+        // これ以上下に移動できない位置か確認
+        if (IsValidPosition(
+            landingPosition + Vector2Int.down,
+            rotatedShape))
+        {
+            return false;
+        }
+
+        // 検証に成功した場合だけ、現在のピースを更新する
+        currentShape = rotatedShape;
+        currentPos = landingPosition;
+        fallTimer = 0f;
+
+        // 既存の処理を使ってピースを固定する。
+        // ライン消去・爆弾処理・浮き島処理も既存処理に任せる。
+        Move(Vector2Int.down);
+
+        return true;
     }
 
+    // ==================================================
     // 自動プレイの判断終了
+    // ==================================================
     public void EndDecision()
     {
         isAutomationDecisionActive = false;
