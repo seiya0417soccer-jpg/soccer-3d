@@ -770,10 +770,39 @@ public class DropPuzzleBattle :
         }
     }
     // 自動プレイの判断開始（仮実装）
+    // 自動プレイの判断開始
     public bool TryBeginDecision(out PuzzleAutomationSnapshot snapshot)
     {
         snapshot = null;
-        return false;
+
+        // 盤面や現在のピースがまだ初期化されていない場合は失敗
+        if (field == null || currentShape == null)
+        {
+            return false;
+        }
+
+        // 盤面の占有状態を bool 配列に変換する
+        bool[,] occupied = new bool[hight, wide];
+
+        for (int y = 0; y < hight; y++)
+        {
+            for (int x = 0; x < wide; x++)
+            {
+                occupied[y, x] = field[y, x] != BlockType.Empty;
+            }
+        }
+
+        // 現在の盤面とピース情報からスナップショットを作成
+        snapshot = new PuzzleAutomationSnapshot(
+            wide,
+            hight,
+            currentType,
+            currentPos,
+            currentShape,
+            occupied
+        );
+
+        return true;
     }
 
     // 選択された配置の実行（仮実装）
