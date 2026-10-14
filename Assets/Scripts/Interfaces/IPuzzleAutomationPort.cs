@@ -13,6 +13,12 @@ public interface IPuzzleAutomationPort
     bool TryBeginDecision(out PuzzleAutomationSnapshot snapshot);
 
     /// <summary>
+    /// 現在のピースが生成された回数を取得する。
+    /// 新しいピースが生成されるたびに値が増加する。
+    /// </summary>
+    int PieceGeneration { get; }
+
+    /// <summary>
     /// 自動プレイ時の1マスごとの落下時間を設定する。
     /// </summary>
     void SetAutomationFallStepInterval(float secondsPerCell);
