@@ -84,6 +84,9 @@ public class DropPuzzleBattle :
     private Vector2Int currentPos;     // 現在のピース基準座標
     private int currentType;           // 現在のピース種別（0〜11）
 
+    // ピースが生成されるたびに増加する番号
+    private int _pieceGeneration = 0;
+
     // 落下タイマー
     private float fallTimer;           // 落下タイマー（経過時間）
     private float fallInterval = 1f;   // 通常落下間隔（秒）
@@ -269,6 +272,9 @@ public class DropPuzzleBattle :
 
         // ピースをフィールド上部中央に配置
         currentPos = new Vector2Int(wide / 2, hight - 2);
+
+        // 次のピースが生成されたことを検知するため、生成番号を増やす
+        _pieceGeneration++;
 
         // 配置位置が有効でなければゲームオーバー
         if (!IsValidPosition(currentPos, currentShape))
