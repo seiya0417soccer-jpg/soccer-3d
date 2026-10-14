@@ -132,16 +132,14 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
     }
 
     /// <summary>
-    /// 自動プレイを停止する。
-    /// API通信中の場合、応答が返っても配置を実行しない。
+    /// 自動プレイの停止を要求する。
+    /// 判断中なら配置せずに終了し、移動中ならその1手が完了してから停止する。
     /// </summary>
     private void StopAutoPlay()
     {
         _isRunning = false;
 
-        // 判断中であれば通常のゲーム進行に戻す
-        _puzzleAutomationPort?.EndDecision();
-
+        // 現在のAPI応答または1手の実行が終わったら停止する
         Debug.Log("[Jev AutoPlayer] 停止要求");
     }
 
@@ -230,10 +228,11 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
                         break;
                     }
 
-                    // 既存のパズル処理を使って配置を実行する
+                    // 移動・落下・盤面処理が完了するまで待つ
                     bool applied =
-                        _puzzleAutomationPort.TryApplyPlacement(
-                            selectedCandidate);
+                        await _puzzleAutomationPort.ExecutePlacementAsync(
+                            selectedCandidate,
+                            _destroyToken);
 
                     if (!applied)
                     {

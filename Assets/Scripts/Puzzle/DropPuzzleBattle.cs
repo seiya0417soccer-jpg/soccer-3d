@@ -1,6 +1,9 @@
-﻿using R3;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using R3;
 using UnityEngine;
 
 /// <summary>
@@ -87,11 +90,11 @@ public class DropPuzzleBattle :
     // ピースが生成されるたびに増加する番号
     private int _pieceGeneration = 0;
 
-    /// 現在のピース生成回数を外部に公開する。
-    public int PieceGeneration => _pieceGeneration;
+    // 最後に描画したピースの生成番号
+    private int _lastDrawnPieceGeneration = -1;
 
-    /// 浮き島の落下や連鎖処理など、盤面の解決処理中かどうか。
-    public bool IsBoardResolving => isProcessingIslands;
+    // 自動プレイの回転・横移動で使用するステップ間隔
+    private const float AutomationMovementStepInterval = 0.12f;
 
     // 落下タイマー
     private float fallTimer;           // 落下タイマー（経過時間）
@@ -260,7 +263,7 @@ public class DropPuzzleBattle :
         else
         {
             // ランダムでピース種別を決定（Extensionがあればそちらで上書き可）
-            int defaultType = Random.Range(0, 9);
+            int defaultType = UnityEngine.Random.Range(0, 9);
             currentType = cachedLogic != null
                 ? cachedLogic.GetNextPieceType(defaultType)
                 : defaultType;
@@ -272,7 +275,7 @@ public class DropPuzzleBattle :
         if (currentType != (int)BlockType.EKeyBomb)
         {
             for (int i = 0; i < currentShape.Length; i++)
-                if (Random.value < crossBombChance)
+                if (UnityEngine.Random.value < crossBombChance)
                     crossBombBlockIndices.Add(i);
         }
 
@@ -593,6 +596,9 @@ public class DropPuzzleBattle :
     {
         _renderer.DrawField(field, hight, wide);
         _renderer.DrawCurrentPiece(currentPos, currentShape, currentType, crossBombBlockIndices, hight);
+
+        // 最後に描画したピースの生成番号を記録する
+        _lastDrawnPieceGeneration = _pieceGeneration;
     }
 
     // ==================================================
@@ -844,9 +850,11 @@ public class DropPuzzleBattle :
     /// 選択された配置を検証して実行する。
     /// 既存の移動・固定・消去処理を利用する。
     // ==================================================
-    public bool TryApplyPlacement(PuzzlePlacementCandidate candidate)
+    public async UniTask<bool> ExecutePlacementAsync(
+    PuzzlePlacementCandidate candidate,
+    CancellationToken cancellationToken)
     {
-        // 判断中でなければ配置を実行しない
+        // 判断中であり、パズルが操作できる状態か確認する
         if (!isAutomationDecisionActive ||
             candidate == null ||
             isProcessingIslands ||
@@ -858,40 +866,36 @@ public class DropPuzzleBattle :
             return false;
         }
 
-        // 不正な回転回数を拒否する
         if (candidate.Rotation < 0 || candidate.Rotation > 3)
         {
             return false;
         }
 
-        // 現在の形状をコピーして、指定回数だけ回転する
-        Vector2Int[] rotatedShape =
-            (Vector2Int[])currentShape.Clone();
+        Vector2Int startPosition = currentPos;
+        Vector2Int[] originalShape = (Vector2Int[])currentShape.Clone();
 
-        for (int rotation = 0; rotation < candidate.Rotation; rotation++)
+        // 最終的な回転形状を計算する
+        Vector2Int[] targetShape = (Vector2Int[])originalShape.Clone();
+        Vector2Int[] rotationCheckShape = (Vector2Int[])originalShape.Clone();
+
+        bool canRotateAtStart = true;
+
+        for (int i = 0; i < candidate.Rotation; i++)
         {
-            Vector2Int[] rotated =
-                new Vector2Int[rotatedShape.Length];
+            rotationCheckShape = RotateAutomationShape(rotationCheckShape);
+            targetShape = RotateAutomationShape(targetShape);
 
-            for (int i = 0; i < rotatedShape.Length; i++)
+            if (canRotateAtStart &&
+                !IsValidPosition(startPosition, rotationCheckShape))
             {
-                rotated[i] = new Vector2Int(
-                    -rotatedShape[i].y,
-                    rotatedShape[i].x);
+                canRotateAtStart = false;
             }
-
-            rotatedShape = rotated;
         }
 
-        // 候補が指定する着地位置
-        Vector2Int landingPosition = new Vector2Int(
-            candidate.AnchorX,
-            candidate.LandingY);
+        // 候補の左端列と基準座標が一致するか確認する
+        int minX = targetShape[0].x;
 
-        // 候補の左端列と基準座標が一致するか検証
-        int minX = rotatedShape[0].x;
-
-        foreach (Vector2Int block in rotatedShape)
+        foreach (Vector2Int block in targetShape)
         {
             minX = Mathf.Min(minX, block.x);
         }
@@ -901,8 +905,97 @@ public class DropPuzzleBattle :
             return false;
         }
 
-        // 最終配置が盤面内に完全に収まるか確認
-        foreach (Vector2Int block in rotatedShape)
+        // 目標位置の高さは、現在のピースと同じにする
+        Vector2Int targetSpawnPosition = new Vector2Int(
+            candidate.AnchorX,
+            startPosition.y);
+
+        if (!IsValidPosition(targetSpawnPosition, targetShape))
+        {
+            return false;
+        }
+
+        int horizontalDirection = candidate.AnchorX.CompareTo(startPosition.x);
+
+        // 回転してから横移動できるか、途中の衝突を調べる
+        bool rotateFirst = canRotateAtStart;
+        Vector2Int checkPosition = startPosition;
+
+        while (checkPosition.x != candidate.AnchorX)
+        {
+            checkPosition.x += horizontalDirection;
+
+            if (!IsValidPosition(checkPosition, targetShape))
+            {
+                rotateFirst = false;
+                break;
+            }
+        }
+
+        // 横移動してから回転する経路も確認する
+        bool horizontalFirst = true;
+        checkPosition = startPosition;
+
+        while (checkPosition.x != candidate.AnchorX)
+        {
+            checkPosition.x += horizontalDirection;
+
+            if (!IsValidPosition(checkPosition, originalShape))
+            {
+                horizontalFirst = false;
+                break;
+            }
+        }
+
+        Vector2Int[] shapeAtTarget = (Vector2Int[])originalShape.Clone();
+        bool canRotateAtTarget = true;
+
+        for (int i = 0; i < candidate.Rotation; i++)
+        {
+            shapeAtTarget = RotateAutomationShape(shapeAtTarget);
+
+            if (canRotateAtTarget &&
+                !IsValidPosition(targetSpawnPosition, shapeAtTarget))
+            {
+                canRotateAtTarget = false;
+            }
+        }
+
+        horizontalFirst &= canRotateAtTarget;
+
+        // どちらの経路でも衝突するなら実行しない
+        if (!rotateFirst && !horizontalFirst)
+        {
+            Debug.LogWarning(
+                "[Jev AutoPlayer] 配置先までの移動経路が塞がれています。");
+
+            return false;
+        }
+
+        // 計算上の着地点が、Jevに提示した候補と一致するか確認する
+        int calculatedLandingY = startPosition.y;
+
+        while (IsValidPosition(
+            new Vector2Int(candidate.AnchorX, calculatedLandingY - 1),
+            targetShape))
+        {
+            calculatedLandingY--;
+        }
+
+        if (calculatedLandingY != candidate.LandingY)
+        {
+            Debug.LogWarning(
+                "[Jev AutoPlayer] 候補の着地点と現在の盤面が一致しません。");
+
+            return false;
+        }
+
+        Vector2Int landingPosition = new Vector2Int(
+            candidate.AnchorX,
+            candidate.LandingY);
+
+        // 着地点が盤面内に収まり、ほかのブロックと重ならないことを確認する
+        foreach (Vector2Int block in targetShape)
         {
             Vector2Int cell = landingPosition + block;
 
@@ -913,30 +1006,111 @@ public class DropPuzzleBattle :
             }
         }
 
-        // 配置場所が空いているか確認
-        if (!IsValidPosition(landingPosition, rotatedShape))
+        if (!IsValidPosition(landingPosition, targetShape) ||
+            IsValidPosition(landingPosition + Vector2Int.down, targetShape))
         {
             return false;
         }
 
-        // これ以上下に移動できない位置か確認
-        if (IsValidPosition(
-            landingPosition + Vector2Int.down,
-            rotatedShape))
+        // ここまでの検証に成功した場合だけ、実際の移動を開始する
+        if (rotateFirst)
         {
-            return false;
+            // 回転してから横移動する
+            for (int i = 0; i < candidate.Rotation; i++)
+            {
+                currentShape = RotateAutomationShape(currentShape);
+
+                await UniTask.Delay(
+                    TimeSpan.FromSeconds(AutomationMovementStepInterval),
+                    cancellationToken: cancellationToken);
+            }
+
+            while (currentPos.x != candidate.AnchorX)
+            {
+                currentPos.x += horizontalDirection;
+
+                await UniTask.Delay(
+                    TimeSpan.FromSeconds(AutomationMovementStepInterval),
+                    cancellationToken: cancellationToken);
+            }
+        }
+        else
+        {
+            // 横移動してから回転する
+            while (currentPos.x != candidate.AnchorX)
+            {
+                currentPos.x += horizontalDirection;
+
+                await UniTask.Delay(
+                    TimeSpan.FromSeconds(AutomationMovementStepInterval),
+                    cancellationToken: cancellationToken);
+            }
+
+            for (int i = 0; i < candidate.Rotation; i++)
+            {
+                currentShape = RotateAutomationShape(currentShape);
+
+                await UniTask.Delay(
+                    TimeSpan.FromSeconds(AutomationMovementStepInterval),
+                    cancellationToken: cancellationToken);
+            }
         }
 
-        // 検証に成功した場合だけ、現在のピースを更新する
-        currentShape = rotatedShape;
-        currentPos = landingPosition;
-        fallTimer = 0f;
+        // 通常の自動落下と同じように、時間をかけて1マスずつ落下する
+        while (true)
+        {
+            await UniTask.Delay(
+                TimeSpan.FromSeconds(automationFallStepInterval),
+                cancellationToken: cancellationToken);
 
-        // 既存の処理を使ってピースを固定する。
-        // ライン消去・爆弾処理・浮き島処理も既存処理に任せる。
+            if (!IsValidPosition(
+                currentPos + Vector2Int.down,
+                currentShape))
+            {
+                break;
+            }
+
+            currentPos += Vector2Int.down;
+        }
+
+        // 一時停止中なら、再開してから既存の固定処理を呼び出す
+        await UniTask.WaitUntil(
+            () => Time.timeScale > 0f,
+            cancellationToken: cancellationToken);
+
+        int generationBeforeFix = _pieceGeneration;
+
+        // 既存の処理を使って固定・消去・爆弾・浮き島処理を開始する
         Move(Vector2Int.down);
 
-        return true;
+        // 次のピースが生成され、盤面解決と新しいピースの描画が終わるまで待つ
+        await UniTask.WaitUntil(
+            () =>
+                !enabled ||
+                (_pieceGeneration > generationBeforeFix &&
+                 !isProcessingIslands &&
+                 _lastDrawnPieceGeneration == _pieceGeneration),
+            cancellationToken: cancellationToken);
+
+        // ゲームオーバーの場合は、次の自動判断へ進まない
+        return enabled &&
+               _pieceGeneration > generationBeforeFix &&
+               !isProcessingIslands &&
+               _lastDrawnPieceGeneration == _pieceGeneration;
+    }
+
+    private static Vector2Int[] RotateAutomationShape(Vector2Int[] shape)
+    {
+        Vector2Int[] rotated = new Vector2Int[shape.Length];
+
+        for (int i = 0; i < shape.Length; i++)
+        {
+            rotated[i] = new Vector2Int(
+                -shape[i].y,
+                shape[i].x);
+        }
+
+        return rotated;
     }
 
     // ==================================================

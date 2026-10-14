@@ -1,28 +1,23 @@
+using System.Threading;
+using Cysharp.Threading.Tasks;
+
 /// <summary>
 /// 自動プレイ機能からパズルを操作するための窓口。
-///
-/// Jevなどの判断方式には依存せず、
-/// 盤面の取得・判断開始・配置実行だけを公開する。
+/// 盤面情報の取得と配置実行を公開し、具体的なゲーム処理から判断方式を分離する。
 /// </summary>
 public interface IPuzzleAutomationPort
 {
-    /// 判断を開始し、現在の盤面情報を取得する。
-    /// 判断中は自動落下と手動入力を停止する。
+    // 判断開始時点の盤面情報を取得し、通常操作を停止する
     bool TryBeginDecision(out PuzzleAutomationSnapshot snapshot);
 
-    /// 現在のピースが生成された回数を取得する。
-    /// 新しいピースが生成されるたびに値が増加する。
-    int PieceGeneration { get; }
-
-    /// 浮き島の落下や連鎖処理など、盤面の解決処理中かどうか。
-    bool IsBoardResolving { get; }
-
-    /// 自動プレイ時の1マスごとの落下時間を設定する。
+    // 自動プレイ時の1マスごとの落下時間を設定する
     void SetAutomationFallStepInterval(float secondsPerCell);
 
-    /// 選択された配置を再検証して実行する。
-    bool TryApplyPlacement(PuzzlePlacementCandidate candidate);
+    // 選択された配置を実行し、次のピースが描画されるまで待つ
+    UniTask<bool> ExecutePlacementAsync(
+        PuzzlePlacementCandidate candidate,
+        CancellationToken cancellationToken);
 
-    /// 判断を終了して通常のゲーム進行に戻す。
+    // 判断・配置処理が終了したら通常のゲーム進行に戻す
     void EndDecision();
 }
