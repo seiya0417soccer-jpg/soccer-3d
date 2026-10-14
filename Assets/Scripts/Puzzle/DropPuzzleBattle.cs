@@ -87,10 +87,11 @@ public class DropPuzzleBattle :
     // ピースが生成されるたびに増加する番号
     private int _pieceGeneration = 0;
 
-    /// <summary>
     /// 現在のピース生成回数を外部に公開する。
-    /// </summary>
     public int PieceGeneration => _pieceGeneration;
+
+    /// 浮き島の落下や連鎖処理など、盤面の解決処理中かどうか。
+    public bool IsBoardResolving => isProcessingIslands;
 
     // 落下タイマー
     private float fallTimer;           // 落下タイマー（経過時間）
