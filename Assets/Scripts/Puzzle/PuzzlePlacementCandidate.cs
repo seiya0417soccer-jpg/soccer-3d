@@ -1,55 +1,47 @@
+// 自動プレイで実行する移動操作
+public enum PuzzlePlacementAction
+{
+    MoveLeft,
+    MoveRight,
+    MoveDown,
+    RotateCounterClockwise
+}
+
 /// <summary>
-/// PuzzlePlacementCandidate.cs
-///
 /// 1つの合法なピース配置候補を表現する。
 ///
 /// Jev専用のデータ型にはせず、配置判断方式から独立させる。
 /// </summary>
 public sealed class PuzzlePlacementCandidate
 {
-    /// <summary>
     /// 候補を識別するためのID。
-    /// </summary>
     public string Id { get; }
 
-    /// <summary>
+    // 配置先までの移動手順
+    private readonly PuzzlePlacementAction[] _actions;
+
     /// 現在の形状から反時計回りに回転させる回数。
-    /// </summary>
     public int Rotation { get; }
 
-    /// <summary>
     /// ピースが占有する最も左の列。
-    /// </summary>
     public int LeftmostColumn { get; }
 
-    /// <summary>
     /// 配置時の基準座標X。
-    /// </summary>
     public int AnchorX { get; }
 
-    /// <summary>
     /// 配置時の基準座標Y。
-    /// </summary>
     public int LandingY { get; }
 
-    /// <summary>
     /// 特殊ブロックの爆発を考慮しない簡易計算による完成行数。
-    /// </summary>
     public int DirectLinesCleared { get; }
 
-    /// <summary>
     /// 直接完成した行を除去した盤面の穴数。
-    /// </summary>
     public int HolesAfterDirectClear { get; }
 
-    /// <summary>
     /// 直接完成した行を除去した盤面の列高さ合計。
-    /// </summary>
     public int AggregateHeightAfterDirectClear { get; }
 
-    /// <summary>
     /// 直接完成した行を除去した盤面の最大列高さ。
-    /// </summary>
     public int MaxHeightAfterDirectClear { get; }
 
     public PuzzlePlacementCandidate(
@@ -61,7 +53,8 @@ public sealed class PuzzlePlacementCandidate
         int directLinesCleared,
         int holesAfterDirectClear,
         int aggregateHeightAfterDirectClear,
-        int maxHeightAfterDirectClear)
+        int maxHeightAfterDirectClear,
+        PuzzlePlacementAction[] actions = null)
     {
         Id = id;
         Rotation = rotation;
@@ -75,12 +68,21 @@ public sealed class PuzzlePlacementCandidate
             aggregateHeightAfterDirectClear;
         MaxHeightAfterDirectClear =
             maxHeightAfterDirectClear;
+
+        // 外部から渡された配列をコピーして保持する
+        _actions = actions == null
+            ? new PuzzlePlacementAction[0]
+            : (PuzzlePlacementAction[])actions.Clone();
     }
 
-    /// <summary>
+    // 移動手順をコピーして取得する
+    public PuzzlePlacementAction[] CopyActions()
+    {
+        return (PuzzlePlacementAction[])_actions.Clone();
+    }
+
     /// 判断方式へ渡す候補の説明を作成する。
     /// 候補IDと説明文は別々に保持する。
-    /// </summary>
     public string ToChoiceDescription()
     {
         return

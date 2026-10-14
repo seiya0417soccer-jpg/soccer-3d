@@ -20,6 +20,34 @@ using UnityEngine;
 /// </summary>
 public sealed class PlacementCandidateGenerator
 {
+    // 盤面上の探索状態と、そこに到達するまでの移動手順
+    private sealed class SearchNode
+    {
+        public Vector2Int Position;
+        public int Rotation;
+        public List<PuzzlePlacementAction> Actions;
+
+        public SearchNode(
+            Vector2Int position,
+            int rotation,
+            List<PuzzlePlacementAction> actions)
+        {
+            Position = position;
+            Rotation = rotation;
+            Actions = actions;
+        }
+    }
+
+    // 各回転・基準X座標で採用する着地点
+    private sealed class LandingInfo
+    {
+        public int Rotation;
+        public int AnchorX;
+        public int LandingY;
+        public Vector2Int[] Shape;
+        public PuzzlePlacementAction[] Actions;
+    }
+
     /// <summary>
     /// 現在の盤面とピースから合法な配置候補を生成する。
     ///
@@ -27,120 +55,218 @@ public sealed class PlacementCandidateGenerator
     /// 何回回転させるかを表す。
     /// </summary>
     public List<PuzzlePlacementCandidate> Generate(
-        PuzzleAutomationSnapshot snapshot)
+    PuzzleAutomationSnapshot snapshot)
     {
         var candidates = new List<PuzzlePlacementCandidate>();
 
-        if (snapshot == null)
+        if (snapshot == null ||
+            snapshot.Width <= 0 ||
+            snapshot.Height <= 0)
+        {
             return candidates;
-
-        int width = snapshot.Width;
-        int height = snapshot.Height;
-
-        if (width <= 0 || height <= 0)
-            return candidates;
+        }
 
         Vector2Int[] originalShape = snapshot.CopyCurrentShape();
 
         if (originalShape == null || originalShape.Length == 0)
             return candidates;
 
-        // Snapshotに保存された現在の形状を基準に回転する。
-        Vector2Int[] rotatedShape =
-            (Vector2Int[])originalShape.Clone();
+        Vector2Int startPosition = snapshot.CurrentPosition;
+        int width = snapshot.Width;
+        int height = snapshot.Height;
 
-        // 最大4方向。対称形状でも回転候補を維持する。
-        // ブロックごとの特殊属性があるため、形状だけで重複除外しない。
-        for (int rotation = 0; rotation < 4; rotation++)
+        if (!IsValidPosition(snapshot, startPosition, originalShape))
+            return candidates;
+
+        // 同じ位置・回転を重複して探索しない
+        bool[,,] visited = new bool[height, width, 4];
+
+        // 回転4方向 × 基準X座標ごとに、着地点を1つ保持する
+        var bestLandings = new LandingInfo[4, width];
+
+        var queue = new Queue<SearchNode>();
+
+        var startNode = new SearchNode(
+            startPosition,
+            0,
+            new List<PuzzlePlacementAction>());
+
+        queue.Enqueue(startNode);
+        visited[startPosition.y, startPosition.x, 0] = true;
+
+        // 左右移動・下移動・回転を組み合わせて、到達可能な位置を探索する
+        while (queue.Count > 0)
         {
-            GetHorizontalBounds(
-                rotatedShape,
-                out int minX,
-                out int maxX);
+            SearchNode node = queue.Dequeue();
 
-            int pieceWidth = maxX - minX + 1;
+            Vector2Int[] shape = GetRotatedShape(
+                originalShape,
+                node.Rotation);
 
-            if (pieceWidth > 0 && pieceWidth <= width)
+            // 現在の位置で下へ移動できない場合、着地点として扱う
+            bool canMoveDown = IsValidPosition(
+                snapshot,
+                node.Position + Vector2Int.down,
+                shape);
+
+            if (!canMoveDown &&
+                node.Position.x >= 0 &&
+                node.Position.x < width &&
+                IsFullyInsideBoard(
+                    width,
+                    height,
+                    node.Position,
+                    shape))
             {
-                // 実際に占有する左端の列を基準に走査する。
-                for (int leftmostColumn = 0;
-                     leftmostColumn <= width - pieceWidth;
-                     leftmostColumn++)
+                int rotation = node.Rotation;
+                int anchorX = node.Position.x;
+                int landingY = node.Position.y;
+
+                LandingInfo previous = bestLandings[rotation, anchorX];
+
+                // 同じ回転・基準Xでは、最も低い着地点を採用する
+                if (previous == null ||
+                    landingY < previous.LandingY ||
+                    (landingY == previous.LandingY &&
+                     node.Actions.Count < previous.Actions.Length))
                 {
-                    // 形状の基準座標と占有範囲の左端を区別する。
-                    int anchorX = leftmostColumn - minX;
-
-                    // 現在のピースの高さから開始する。
-                    // 横移動先で既存ブロックと重なる候補は除外する。
-                    var spawnPosition = new Vector2Int(
-                        anchorX,
-                        snapshot.CurrentPosition.y);
-
-                    if (!IsValidPosition(
-                        snapshot,
-                        spawnPosition,
-                        rotatedShape))
+                    bestLandings[rotation, anchorX] = new LandingInfo
                     {
-                        continue;
-                    }
-
-                    // 真下に移動できなくなる位置まで落下させる。
-                    int landingY = spawnPosition.y;
-
-                    while (IsValidPosition(
-                        snapshot,
-                        new Vector2Int(anchorX, landingY - 1),
-                        rotatedShape))
-                    {
-                        landingY--;
-                    }
-
-                    var landingPosition = new Vector2Int(
-                        anchorX,
-                        landingY);
-
-                    // 最終配置が盤面内に完全に収まるか確認する。
-                    if (!IsFullyInsideBoard(
-                        width,
-                        height,
-                        landingPosition,
-                        rotatedShape))
-                    {
-                        continue;
-                    }
-
-                    EvaluatePlacement(
-                        snapshot,
-                        landingPosition,
-                        rotatedShape,
-                        out int directLinesCleared,
-                        out int holesAfterClear,
-                        out int aggregateHeightAfterClear,
-                        out int maxHeightAfterClear);
-
-                    // 同じピース内で一意になる識別子。
-                    string candidateId =
-                        $"R{rotation}_L{leftmostColumn:D2}";
-
-                    candidates.Add(
-                        new PuzzlePlacementCandidate(
-                            candidateId,
-                            rotation,
-                            leftmostColumn,
-                            anchorX,
-                            landingY,
-                            directLinesCleared,
-                            holesAfterClear,
-                            aggregateHeightAfterClear,
-                            maxHeightAfterClear));
+                        Rotation = rotation,
+                        AnchorX = anchorX,
+                        LandingY = landingY,
+                        Shape = shape,
+                        Actions = node.Actions.ToArray()
+                    };
                 }
             }
 
-            // DropPuzzleBattle.Rotate()と同じ回転規則。
-            rotatedShape = RotateShape(rotatedShape);
+            // 左右移動・下移動を探索する
+            TryEnqueue(
+                snapshot, node, node.Position + Vector2Int.left,
+                node.Rotation, PuzzlePlacementAction.MoveLeft,
+                originalShape, queue, visited);
+
+            TryEnqueue(
+                snapshot, node, node.Position + Vector2Int.right,
+                node.Rotation, PuzzlePlacementAction.MoveRight,
+                originalShape, queue, visited);
+
+            TryEnqueue(
+                snapshot, node, node.Position + Vector2Int.down,
+                node.Rotation, PuzzlePlacementAction.MoveDown,
+                originalShape, queue, visited);
+
+            // 反時計回りに1回転する。回転後の位置が合法な場合だけ探索する
+            int nextRotation = (node.Rotation + 1) % 4;
+
+            TryEnqueue(
+                snapshot, node, node.Position,
+                nextRotation, PuzzlePlacementAction.RotateCounterClockwise,
+                originalShape, queue, visited);
+        }
+
+        // 探索結果を配置候補に変換する
+        for (int rotation = 0; rotation < 4; rotation++)
+        {
+            for (int anchorX = 0; anchorX < width; anchorX++)
+            {
+                LandingInfo landing = bestLandings[rotation, anchorX];
+
+                if (landing == null)
+                    continue;
+
+                Vector2Int landingPosition = new Vector2Int(
+                    landing.AnchorX,
+                    landing.LandingY);
+
+                EvaluatePlacement(
+                    snapshot,
+                    landingPosition,
+                    landing.Shape,
+                    out int directLinesCleared,
+                    out int holesAfterClear,
+                    out int aggregateHeightAfterClear,
+                    out int maxHeightAfterClear);
+
+                GetHorizontalBounds(
+                    landing.Shape,
+                    out int minX,
+                    out int maxX);
+
+                int leftmostColumn = landing.AnchorX + minX;
+
+                // 回転・基準X・着地点を組み合わせて候補を識別する
+                string candidateId =
+                    $"R{rotation}_X{anchorX:D2}_Y{landing.LandingY:D2}";
+
+                candidates.Add(
+                    new PuzzlePlacementCandidate(
+                        candidateId,
+                        rotation,
+                        leftmostColumn,
+                        anchorX,
+                        landing.LandingY,
+                        directLinesCleared,
+                        holesAfterClear,
+                        aggregateHeightAfterClear,
+                        maxHeightAfterClear,
+                        landing.Actions));
+            }
         }
 
         return candidates;
+    }
+
+    // 操作後の位置と回転が合法なら、次の探索対象として登録する
+    private static void TryEnqueue(
+        PuzzleAutomationSnapshot snapshot,
+        SearchNode current,
+        Vector2Int position,
+        int rotation,
+        PuzzlePlacementAction action,
+        Vector2Int[] originalShape,
+        Queue<SearchNode> queue,
+        bool[,,] visited)
+    {
+        // 探索配列の範囲外にある基準座標は扱わない
+        if (position.x < 0 || position.x >= snapshot.Width ||
+            position.y < 0 || position.y >= snapshot.Height)
+        {
+            return;
+        }
+
+        Vector2Int[] shape = GetRotatedShape(originalShape, rotation);
+
+        // 壁・床・固定ブロックに干渉する移動は候補にしない
+        if (!IsValidPosition(snapshot, position, shape))
+            return;
+
+        // 同じ位置・回転は一度だけ探索する
+        if (visited[position.y, position.x, rotation])
+            return;
+
+        visited[position.y, position.x, rotation] = true;
+
+        var actions = new List<PuzzlePlacementAction>(current.Actions);
+        actions.Add(action);
+
+        queue.Enqueue(new SearchNode(position, rotation, actions));
+    }
+
+    // 開始時の形状を基準に、反時計回りの回転を必要な回数だけ適用する
+    private static Vector2Int[] GetRotatedShape(
+        Vector2Int[] originalShape,
+        int rotation)
+    {
+        Vector2Int[] shape = (Vector2Int[])originalShape.Clone();
+
+        for (int i = 0; i < rotation; i++)
+        {
+            shape = RotateShape(shape);
+        }
+
+        return shape;
     }
 
     /// <summary>
