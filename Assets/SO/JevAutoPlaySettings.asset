@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 568a902d4d35a2c4d915e95c9449cb41, type: 3}
   m_Name: JevAutoPlaySettings
   m_EditorClassIdentifier: 
-  fallStepInterval: 0.25
+  fallStepInterval: 0.1
