@@ -2149,6 +2149,7 @@ GameObject:
   - component: {fileID: 717315851}
   - component: {fileID: 717315850}
   - component: {fileID: 717315849}
+  - component: {fileID: 717315853}
   m_Layer: 5
   m_Name: JevAutoPlayDebugCanvas
   m_TagString: Untagged
@@ -2239,6 +2240,24 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &717315853
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 717315848}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 943f01d7e7f835f4198c4d41ce4edf56, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _panelRoot: {fileID: 1807599623}
+  _togglePanelKey: 9
+  _autoPlayer: {fileID: 103008130}
+  _startButton: {fileID: 1206233157}
+  _stopButton: {fileID: 732187566}
+  _statusText: {fileID: 546327292}
 --- !u!1 &732187564
 GameObject:
   m_ObjectHideFlags: 0
@@ -6809,7 +6828,6 @@ GameObject:
   - component: {fileID: 1807599624}
   - component: {fileID: 1807599626}
   - component: {fileID: 1807599625}
-  - component: {fileID: 1807599627}
   m_Layer: 5
   m_Name: JevAutoPlayPanel
   m_TagString: Untagged
@@ -6877,22 +6895,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1807599623}
   m_CullTransparentMesh: 1
---- !u!114 &1807599627
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1807599623}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 943f01d7e7f835f4198c4d41ce4edf56, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _autoPlayer: {fileID: 103008130}
-  _startButton: {fileID: 1206233157}
-  _stopButton: {fileID: 732187566}
-  _statusText: {fileID: 546327292}
 --- !u!1 &1831282731
 GameObject:
   m_ObjectHideFlags: 0
