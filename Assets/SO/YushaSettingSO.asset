@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: YushaSettingSO
   m_EditorClassIdentifier: 
   _defaultSpeed: 1.2
-  _attackDistance: 2.5
+  _attackDistance: 3.5
   _attackDelay: 0.3
