@@ -14,9 +14,9 @@ using VContainer;
 /// - 合法な配置候補を生成する
 /// - Jevに配置候補を選択させる
 /// - 選択結果をパズルに反映する
-/// - 次のピースでも同じ処理を繰り返す
+/// - 盤面処理完了後、次のピースでも同じ処理を繰り返す
 ///
-/// 特殊ブロックの戦略は扱わず、基本的な配置判断を行う。
+/// ゲーム終了時は自動プレイを停止し、特殊ブロックの戦略は扱わない。
 /// </summary>
 public sealed class JevPuzzleAutoPlayer : MonoBehaviour
 {
@@ -34,7 +34,7 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
     // 判断を開始できない場合の再確認間隔
     private const int IdleDelayMilliseconds = 250;
 
-    // 1手を実行した後、次の判断までに空ける時間
+    // 1手の実行後、次の判断までに空ける時間
     private const int BetweenMovesMilliseconds = 150;
 
     // Unity Editorまたは開発用ビルドかどうか
@@ -51,17 +51,20 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
         "選択肢として与えられた候補IDから1つだけ選んでください。";
 
     private IPuzzleAutomationPort _puzzleAutomationPort;
+    private IGameLifecycleEvents _gameLifecycleEvents;
 
     private JevClient _jevClient;
     private PlacementCandidateGenerator _candidateGenerator;
 
     private CancellationToken _destroyToken;
 
+    // 現在の自動プレイをキャンセルするためのトークン
+    private CancellationTokenSource _runCancellation;
+
     // 自動プレイを継続するか
     private bool _isRunning;
 
     // 前の非同期処理が終了しているか
-    // API応答待ちの処理が重複するのを防ぐ
     private bool _loopActive;
 
     // UIから参照する自動プレイの状態
@@ -74,13 +77,19 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
     // 停止要求後も含め、処理が完全に終了していないか
     public bool IsBusy => _loopActive;
 
-    // 状態が変わったときにUIへ通知する
+    // 状態変化をUIへ通知する
     public event Action<JevAutoPlayStatus> StatusChanged;
 
     [Inject]
-    public void Construct(IPuzzleAutomationPort puzzleAutomationPort)
+    public void Construct(
+        IPuzzleAutomationPort puzzleAutomationPort,
+        IGameLifecycleEvents gameLifecycleEvents)
     {
         _puzzleAutomationPort = puzzleAutomationPort;
+        _gameLifecycleEvents = gameLifecycleEvents;
+
+        // ゲーム終了を検知して自動プレイを強制停止する
+        _gameLifecycleEvents.GameEnded += OnGameEnded;
     }
 
     private void Awake()
@@ -99,7 +108,12 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
 
     private void Update()
     {
-        // Jキーによる従来の開始・停止操作を維持する
+        if (!IsDevelopmentEnvironment)
+        {
+            return;
+        }
+
+        // Jキーによる開始・停止操作を維持する
         if (!Input.GetKeyDown(_toggleKey))
         {
             return;
@@ -117,11 +131,10 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
 
     /// <summary>
     /// 自動プレイを開始する。
-    /// UIからも呼び出せる。
+    /// 実際のゲームプレイ中だけ開始できる。
     /// </summary>
     public void StartAutoPlay()
     {
-        // 製品版からの開始要求は受け付けない
         if (!IsDevelopmentEnvironment)
         {
             return;
@@ -132,11 +145,21 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
             return;
         }
 
-        // 前回の非同期処理が終了するまでは再開しない
+        // 前回の非同期処理が完全に終わるまでは再開しない
         if (_loopActive)
         {
             Debug.LogWarning(
                 "[Jev AutoPlayer] 前回の判断処理が終了するまで待ってください。");
+
+            return;
+        }
+
+        // タイトル・カウントダウン・リザルト画面では開始しない
+        if (_gameLifecycleEvents == null ||
+            !_gameLifecycleEvents.IsGameActive)
+        {
+            Debug.LogWarning(
+                "[Jev AutoPlayer] ゲームプレイ中のみ開始できます。");
 
             return;
         }
@@ -165,6 +188,12 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
         _puzzleAutomationPort.SetAutomationFallStepInterval(
             _settings.FallStepInterval);
 
+        // 今回の実行専用のキャンセルトークンを作成する
+        _runCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(_destroyToken);
+
+        CancellationToken runToken = _runCancellation.Token;
+
         _loopActive = true;
         _isRunning = true;
 
@@ -172,12 +201,12 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
 
         Debug.Log("[Jev AutoPlayer] 自動プレイ開始");
 
-        RunLoopAsync().Forget();
+        RunLoopAsync(runToken).Forget();
     }
 
     /// <summary>
     /// 自動プレイの停止を要求する。
-    /// API判断中なら結果を適用せず、移動中なら現在の1手の終了を待つ。
+    /// 判断中なら通信をキャンセルし、移動中なら現在の1手を完了して停止する。
     /// </summary>
     public void StopAutoPlay()
     {
@@ -188,7 +217,13 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
 
         _isRunning = false;
 
-        // 実行中の処理が残っている場合は、その終了を待つ
+        // 移動実行中はその1手を完了させる。
+        // それ以外では待機や通信をキャンセルする。
+        if (Status != JevAutoPlayStatus.Executing)
+        {
+            _runCancellation?.Cancel();
+        }
+
         SetStatus(
             _loopActive
                 ? JevAutoPlayStatus.Stopping
@@ -198,14 +233,42 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
     }
 
     /// <summary>
+    /// ゲームオーバーまたは制限時間終了時に自動プレイを強制停止する。
+    /// </summary>
+    private void OnGameEnded()
+    {
+        _isRunning = false;
+
+        // ゲーム終了時は移動中でもキャンセルする
+        _runCancellation?.Cancel();
+
+        SetStatus(
+            _loopActive
+                ? JevAutoPlayStatus.Stopping
+                : JevAutoPlayStatus.Stopped);
+
+        Debug.Log("[Jev AutoPlayer] ゲーム終了により自動プレイを停止しました。");
+    }
+
+    /// <summary>
     /// 自動プレイのメインループ。
     /// </summary>
-    private async UniTaskVoid RunLoopAsync()
+    private async UniTaskVoid RunLoopAsync(
+        CancellationToken cancellationToken)
     {
         try
         {
             while (_isRunning)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // ゲーム終了状態なら次の判断を開始しない
+                if (_gameLifecycleEvents == null ||
+                    !_gameLifecycleEvents.IsGameActive)
+                {
+                    break;
+                }
+
                 SetStatus(JevAutoPlayStatus.WaitingForBoard);
 
                 // 盤面情報を取得し、通常操作を停止する
@@ -214,13 +277,20 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
                 {
                     await UniTask.Delay(
                         IdleDelayMilliseconds,
-                        cancellationToken: _destroyToken);
+                        cancellationToken: cancellationToken);
 
                     continue;
                 }
 
                 try
                 {
+                    // ゲーム終了後に判断を開始しない
+                    if (!_isRunning ||
+                        !_gameLifecycleEvents.IsGameActive)
+                    {
+                        break;
+                    }
+
                     SetStatus(JevAutoPlayStatus.Judging);
 
                     // 合法な配置候補を生成する
@@ -251,15 +321,20 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
                         snapshot,
                         candidates);
 
+                    // キャンセル可能なAPIリクエストを行う
                     // 1ピースにつき原則1回だけ問い合わせる
                     JevDecision decision =
                         await _jevClient.SendChoiceRequestAsync(
                             state,
                             Instructions,
+                            cancellationToken,
                             choices);
 
-                    // 停止要求後に古い判断結果を実行しない
-                    if (!_isRunning || _destroyToken.IsCancellationRequested)
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    // 停止要求後やゲーム終了後に古い判断結果を実行しない
+                    if (!_isRunning ||
+                        !_gameLifecycleEvents.IsGameActive)
                     {
                         break;
                     }
@@ -294,21 +369,27 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
                         break;
                     }
 
-                    // 移動・落下・盤面処理が完了するまで待つ
+                    // 移動・落下・盤面処理を実行する
                     SetStatus(JevAutoPlayStatus.Executing);
 
                     bool applied =
                         await _puzzleAutomationPort.ExecutePlacementAsync(
                             selectedCandidate,
-                            _destroyToken);
+                            cancellationToken);
+
+                    cancellationToken.ThrowIfCancellationRequested();
 
                     if (!applied)
                     {
-                        SetStatus(JevAutoPlayStatus.Error);
+                        // ゲーム終了が原因なら通常のエラー扱いにしない
+                        if (_gameLifecycleEvents.IsGameActive)
+                        {
+                            SetStatus(JevAutoPlayStatus.Error);
 
-                        Debug.LogWarning(
-                            "[Jev AutoPlayer] 配置を実行できなかったため停止します: " +
-                            selectedCandidate.Id);
+                            Debug.LogWarning(
+                                "[Jev AutoPlayer] 配置を実行できなかったため停止します: " +
+                                selectedCandidate.Id);
+                        }
 
                         _isRunning = false;
                         break;
@@ -321,24 +402,22 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
                 }
                 finally
                 {
-                    // 成功・失敗のどちらでも判断中の状態を解除する
+                    // 成功・失敗・キャンセル時も通常操作への復帰を試みる
                     _puzzleAutomationPort.EndDecision();
                 }
 
                 // 次のピースに移るまで少し待つ
                 if (_isRunning)
                 {
-                    SetStatus(JevAutoPlayStatus.WaitingForBoard);
-
                     await UniTask.Delay(
                         BetweenMovesMilliseconds,
-                        cancellationToken: _destroyToken);
+                        cancellationToken: cancellationToken);
                 }
             }
         }
         catch (OperationCanceledException)
         {
-            // オブジェクト破棄時などのキャンセルは正常終了として扱う
+            // 手動停止・ゲーム終了・オブジェクト破棄によるキャンセル
         }
         catch (Exception exception)
         {
@@ -347,13 +426,18 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
         }
         finally
         {
-            // 予期しない終了時にも通常操作への復帰を試みる
+            // 予期しない終了時にも判断中の状態を解除する
             _puzzleAutomationPort?.EndDecision();
 
             _isRunning = false;
+
+            // 今回の実行で使用したキャンセルトークンを破棄する
+            _runCancellation?.Dispose();
+            _runCancellation = null;
+
             _loopActive = false;
 
-            // エラー状態は維持し、通常の終了だけ停止状態にする
+            // エラー状態は維持し、それ以外は停止済みにする
             if (Status != JevAutoPlayStatus.Error &&
                 !_destroyToken.IsCancellationRequested)
             {
@@ -402,8 +486,16 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
 
     private void OnDestroy()
     {
-        // シーン終了時などに自動プレイを停止する
+        // ゲーム終了イベントの購読を解除する
+        if (_gameLifecycleEvents != null)
+        {
+            _gameLifecycleEvents.GameEnded -= OnGameEnded;
+        }
+
+        // シーン終了時などにも自動プレイを停止する
         _isRunning = false;
+        _runCancellation?.Cancel();
+
         _puzzleAutomationPort?.EndDecision();
     }
 }

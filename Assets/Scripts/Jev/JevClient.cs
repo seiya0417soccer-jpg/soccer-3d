@@ -1,22 +1,20 @@
 using System;
 using System.Text;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
 /// <summary>
-/// JevClient.cs
-///
 /// TypeSafe AI / Jev APIとの通信を担当するクラス。
 ///
 /// 役割：
-/// - 環境変数からAPIキーを取得
-/// - Jev APIへHTTPリクエストを送信
-/// - Jevから返ってきたJSONを解析
+/// - 環境変数からAPIキーを取得する
+/// - Jev APIへHTTPリクエストを送信する
+/// - Jevから返ってきたJSONを解析する
 /// - Jevの判断結果をJevDecisionとして返す
 ///
-/// 現在はOtameshiでの技術検証用。
-/// 実際のゲーム状態は呼び出し側から渡せるようにしている。
+/// 通信のキャンセルにも対応し、呼び出し側から処理を制御できるようにする。
 /// </summary>
 public class JevClient
 {
@@ -29,34 +27,45 @@ public class JevClient
 
     /// <summary>
     /// Choice形式の質問をJevへ送信する。
-    ///
-    /// state：
-    ///     Jevへ渡す状態情報
-    ///
-    /// instructions：
-    ///     Jevへの質問内容
-    ///
-    /// choices：
-    ///     Jevが選択できる候補
+    /// 既存の呼び出し元との互換性を維持する。
     /// </summary>
-    public async UniTask<JevDecision> SendChoiceRequestAsync(
+    public UniTask<JevDecision> SendChoiceRequestAsync(
         string state,
         string instructions,
         params string[] choices)
     {
-        // Windowsのユーザー環境変数からAPIキーを取得
+        return SendChoiceRequestAsync(
+            state,
+            instructions,
+            CancellationToken.None,
+            choices);
+    }
+
+    /// <summary>
+    /// Choice形式の質問をJevへ送信する。
+    /// キャンセルトークンによって通信待ちを中断できる。
+    /// </summary>
+    public async UniTask<JevDecision> SendChoiceRequestAsync(
+        string state,
+        string instructions,
+        CancellationToken cancellationToken,
+        params string[] choices)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Windowsのユーザー環境変数からAPIキーを取得する
         string apiKey =
             Environment.GetEnvironmentVariable("TYPESAFE_API_KEY");
 
-        // APIキーが取得できなかった場合
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             Debug.LogError(
-                "TYPESAFE_API_KEY が取得できません。"
-            );
+                "TYPESAFE_API_KEY が取得できません。");
 
             return null;
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Choiceの候補をJSONのcriteriaとして組み立てる
         StringBuilder criteriaBuilder = new StringBuilder();
@@ -66,8 +75,7 @@ public class JevClient
             string choice = choices[i];
 
             criteriaBuilder.Append(
-                $"\"{EscapeJson(choice)}\":\"{EscapeJson(choice)}\""
-            );
+                $"\"{EscapeJson(choice)}\":\"{EscapeJson(choice)}\"");
 
             if (i < choices.Length - 1)
             {
@@ -75,13 +83,7 @@ public class JevClient
             }
         }
 
-        // Jevへ送信するJSONを作成
-        //
-        // state：
-        //     Jevが判断するための状態
-        //
-        // questions：
-        //     今回はactionというChoice質問を1つ送る
+        // Jevへ送信するJSONを作成する
         string json = $@"{{
             ""state"": ""{EscapeJson(state)}"",
             ""model"": ""{Model}"",
@@ -96,15 +98,16 @@ public class JevClient
             }}
         }}";
 
-        // HTTP POSTリクエストを作成
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // HTTP POSTリクエストを作成する
         using UnityWebRequest request =
             new UnityWebRequest(Endpoint, "POST");
 
-        // JSONをUTF-8へ変換
-        byte[] body =
-            Encoding.UTF8.GetBytes(json);
+        // JSONをUTF-8へ変換する
+        byte[] body = Encoding.UTF8.GetBytes(json);
 
-        // リクエストボディを設定
+        // リクエストボディを設定する
         request.uploadHandler =
             new UploadHandlerRaw(body);
 
@@ -112,20 +115,21 @@ public class JevClient
         request.downloadHandler =
             new DownloadHandlerBuffer();
 
-        // JSONを送信することを指定
+        // JSONを送信することを指定する
         request.SetRequestHeader(
             "Content-Type",
-            "application/json"
-        );
+            "application/json");
 
         // Bearer認証
         request.SetRequestHeader(
             "Authorization",
-            $"Bearer {apiKey}"
-        );
+            $"Bearer {apiKey}");
 
-        // API通信
-        await request.SendWebRequest();
+        // API通信を行い、キャンセル要求にも対応する
+        await request.SendWebRequest()
+            .WithCancellation(cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         // 通信失敗
         if (request.result != UnityWebRequest.Result.Success)
@@ -133,56 +137,50 @@ public class JevClient
             Debug.LogError(
                 $"Jev API Error: {request.responseCode}\n" +
                 $"{request.error}\n" +
-                $"{request.downloadHandler.text}"
-            );
+                $"{request.downloadHandler.text}");
 
             return null;
         }
 
-        // レスポンスJSON取得
+        // レスポンスJSONを取得する
         string responseJson =
             request.downloadHandler.text;
 
-        // デバッグ用にレスポンス全体を表示
+        // デバッグ用にレスポンス全体を表示する
         Debug.Log(
-            $"Jev API Response:\n{responseJson}"
-        );
+            $"Jev API Response:\n{responseJson}");
 
-        // JSONをC#オブジェクトへ変換
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // JSONをC#オブジェクトへ変換する
         JevApiResponse response =
-            JsonUtility.FromJson<JevApiResponse>(
-                responseJson
-            );
+            JsonUtility.FromJson<JevApiResponse>(responseJson);
 
         // 必要なデータが取得できなかった場合
-        if (
-            response == null ||
+        if (response == null ||
             response.answers == null ||
-            response.answers.action == null
-        )
+            response.answers.action == null)
         {
             Debug.LogError(
-                "Jevのレスポンスを解析できませんでした。"
-            );
+                "Jevのレスポンスを解析できませんでした。");
 
             return null;
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         // 必要な情報だけを返す
         return new JevDecision
         {
-            choice =
-                response.answers.action.choice,
-
-            confidence =
-                response.answers.action.confidence
+            choice = response.answers.action.choice,
+            confidence = response.answers.action.confidence
         };
     }
 
     /// <summary>
-    /// JSON文字列内で特殊文字を安全に扱うための簡易エスケープ。
+    /// JSON文字列内の特殊文字をエスケープする。
     /// </summary>
-    private string EscapeJson(string value)
+    private static string EscapeJson(string value)
     {
         if (string.IsNullOrEmpty(value))
         {
