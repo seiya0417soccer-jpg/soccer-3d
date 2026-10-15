@@ -1,8 +1,10 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using R3;
-using VContainer;
+using UnityEngine;
 
 /// <summary>
 /// DropPuzzleBattle.cs
@@ -17,7 +19,10 @@ using VContainer;
 /// - ゲームオーバー検出→GameFlowManagerへ通知
 /// - IPuzzleFieldを実装してバトル側との疎結合を実現（R3）
 /// </summary>
-public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
+public class DropPuzzleBattle :
+    MonoBehaviour,
+    IPuzzleField,
+    IPuzzleAutomationPort
 {
     // ==================================================
     // BlockType enum: フィールド上のブロック種別
@@ -82,6 +87,15 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
     private Vector2Int currentPos;     // 現在のピース基準座標
     private int currentType;           // 現在のピース種別（0〜11）
 
+    // ピースが生成されるたびに増加する番号
+    private int _pieceGeneration = 0;
+
+    // 最後に描画したピースの生成番号
+    private int _lastDrawnPieceGeneration = -1;
+
+    // 自動プレイの回転・横移動で使用するステップ間隔
+    private const float AutomationMovementStepInterval = 0.12f;
+
     // 落下タイマー
     private float fallTimer;           // 落下タイマー（経過時間）
     private float fallInterval = 1f;   // 通常落下間隔（秒）
@@ -96,6 +110,12 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
     // その他制御フラグ
     private bool skipDestroyedNotification = false; // ブロック消去通知をスキップするフラグ
     private int forcedNextPieceType = -1;           // 次のピース種別を強制指定（-1=通常）
+
+    // Jevなどが判断している間は通常操作を停止する
+    private bool isAutomationDecisionActive = false;
+
+    // Jev自動プレイ専用の1マスごとの落下時間（秒）
+    private float automationFallStepInterval = 1f;
 
     // CrossBombになるブロックインデックスの確率
     [SerializeField, Range(0f, 1f)] private float crossBombChance = 0.1f;
@@ -197,6 +217,14 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
     // ==================================================
     void Update()
     {
+        // 自動プレイの判断中は落下と手動操作を停止する
+        // 描画は続ける
+        if (isAutomationDecisionActive)
+        {
+            Draw();
+            return;
+        }
+
         fallTimer += Time.deltaTime;
 
         // Sキー押しっぱなしで高速落下
@@ -235,7 +263,7 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
         else
         {
             // ランダムでピース種別を決定（Extensionがあればそちらで上書き可）
-            int defaultType = Random.Range(0, 9);
+            int defaultType = UnityEngine.Random.Range(0, 9);
             currentType = cachedLogic != null
                 ? cachedLogic.GetNextPieceType(defaultType)
                 : defaultType;
@@ -247,12 +275,15 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
         if (currentType != (int)BlockType.EKeyBomb)
         {
             for (int i = 0; i < currentShape.Length; i++)
-                if (Random.value < crossBombChance)
+                if (UnityEngine.Random.value < crossBombChance)
                     crossBombBlockIndices.Add(i);
         }
 
         // ピースをフィールド上部中央に配置
         currentPos = new Vector2Int(wide / 2, hight - 2);
+
+        // 次のピースが生成されたことを検知するため、生成番号を増やす
+        _pieceGeneration++;
 
         // 配置位置が有効でなければゲームオーバー
         if (!IsValidPosition(currentPos, currentShape))
@@ -565,6 +596,9 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
     {
         _renderer.DrawField(field, hight, wide);
         _renderer.DrawCurrentPiece(currentPos, currentShape, currentType, crossBombBlockIndices, hight);
+
+        // 最後に描画したピースの生成番号を記録する
+        _lastDrawnPieceGeneration = _pieceGeneration;
     }
 
     // ==================================================
@@ -765,5 +799,292 @@ public class DropPuzzleBattle : MonoBehaviour, IPuzzleField
 
             yield return new WaitForSeconds(interval);
         }
+    }
+
+    // ==================================================
+    // 自動プレイの判断開始
+    // ==================================================
+    public bool TryBeginDecision(out PuzzleAutomationSnapshot snapshot)
+    {
+        snapshot = null;
+
+        // すでに判断中、または盤面が操作できない状態なら開始しない
+        if (isAutomationDecisionActive ||
+            isProcessingIslands ||
+            !enabled ||
+            field == null ||
+            currentShape == null ||
+            Time.timeScale == 0f)
+        {
+            return false;
+        }
+
+        // 現在の盤面をコピーする
+        bool[,] occupied = new bool[hight, wide];
+
+        for (int y = 0; y < hight; y++)
+        {
+            for (int x = 0; x < wide; x++)
+            {
+                occupied[y, x] = field[y, x] != BlockType.Empty;
+            }
+        }
+
+        // 判断開始時点の盤面とピースを保存する
+        snapshot = new PuzzleAutomationSnapshot(
+            wide,
+            hight,
+            currentType,
+            currentPos,
+            currentShape,
+            occupied
+        );
+
+        // 通常の落下と操作を停止する
+        isAutomationDecisionActive = true;
+
+        return true;
+    }
+
+    // ==================================================
+    // 選択された配置を検証して実行する。
+    // 候補に保存された移動手順を使い、既存の固定・消去処理を利用する。
+    // ==================================================
+    public async UniTask<bool> ExecutePlacementAsync(
+        PuzzlePlacementCandidate candidate,
+        CancellationToken cancellationToken)
+    {
+        // 判断中であり、パズルが操作できる状態か確認する
+        if (!isAutomationDecisionActive ||
+            candidate == null ||
+            isProcessingIslands ||
+            !enabled ||
+            field == null ||
+            currentShape == null ||
+            Time.timeScale == 0f)
+        {
+            return false;
+        }
+
+        if (candidate.Rotation < 0 || candidate.Rotation > 3)
+        {
+            return false;
+        }
+
+        // 候補に保存されている移動手順を取得する
+        PuzzlePlacementAction[] actions = candidate.CopyActions();
+
+        if (actions == null)
+        {
+            return false;
+        }
+
+        // 実行前に移動手順をシミュレーションする
+        Vector2Int simulatedPosition = currentPos;
+        Vector2Int[] simulatedShape = (Vector2Int[])currentShape.Clone();
+        int simulatedRotation = 0;
+
+        foreach (PuzzlePlacementAction action in actions)
+        {
+            switch (action)
+            {
+                case PuzzlePlacementAction.MoveLeft:
+                    {
+                        Vector2Int nextPosition =
+                            simulatedPosition + Vector2Int.left;
+
+                        if (!IsValidPosition(nextPosition, simulatedShape))
+                        {
+                            return false;
+                        }
+
+                        simulatedPosition = nextPosition;
+                        break;
+                    }
+
+                case PuzzlePlacementAction.MoveRight:
+                    {
+                        Vector2Int nextPosition =
+                            simulatedPosition + Vector2Int.right;
+
+                        if (!IsValidPosition(nextPosition, simulatedShape))
+                        {
+                            return false;
+                        }
+
+                        simulatedPosition = nextPosition;
+                        break;
+                    }
+
+                case PuzzlePlacementAction.MoveDown:
+                    {
+                        Vector2Int nextPosition =
+                            simulatedPosition + Vector2Int.down;
+
+                        if (!IsValidPosition(nextPosition, simulatedShape))
+                        {
+                            return false;
+                        }
+
+                        simulatedPosition = nextPosition;
+                        break;
+                    }
+
+                case PuzzlePlacementAction.RotateCounterClockwise:
+                    {
+                        Vector2Int[] rotatedShape =
+                            RotateAutomationShape(simulatedShape);
+
+                        if (!IsValidPosition(simulatedPosition, rotatedShape))
+                        {
+                            return false;
+                        }
+
+                        simulatedShape = rotatedShape;
+                        simulatedRotation = (simulatedRotation + 1) % 4;
+                        break;
+                    }
+
+                default:
+                    // 未対応の操作は実行しない
+                    return false;
+            }
+        }
+
+        // シミュレーション結果が選択された候補と一致するか確認する
+        if (simulatedPosition.x != candidate.AnchorX ||
+            simulatedPosition.y != candidate.LandingY ||
+            simulatedRotation != candidate.Rotation)
+        {
+            Debug.LogWarning(
+                "[Jev AutoPlayer] 移動手順と候補の配置が一致しません。");
+
+            return false;
+        }
+
+        // 左端の列も候補情報と一致するか確認する
+        int minX = int.MaxValue;
+
+        foreach (Vector2Int block in simulatedShape)
+        {
+            minX = Mathf.Min(minX, block.x);
+        }
+
+        if (candidate.AnchorX + minX != candidate.LeftmostColumn)
+        {
+            return false;
+        }
+
+        // 着地点の全ブロックが盤面内に収まることを確認する
+        foreach (Vector2Int block in simulatedShape)
+        {
+            Vector2Int cell = simulatedPosition + block;
+
+            if (cell.x < 0 || cell.x >= wide ||
+                cell.y < 0 || cell.y >= hight)
+            {
+                return false;
+            }
+        }
+
+        // 着地点が有効で、さらに1マス下へ落ちないことを確認する
+        if (!IsValidPosition(simulatedPosition, simulatedShape) ||
+            IsValidPosition(
+                simulatedPosition + Vector2Int.down,
+                simulatedShape))
+        {
+            return false;
+        }
+
+        // 検証に成功したら、候補の移動手順を順番に実行する
+        foreach (PuzzlePlacementAction action in actions)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            switch (action)
+            {
+                case PuzzlePlacementAction.MoveLeft:
+                    currentPos += Vector2Int.left;
+                    break;
+
+                case PuzzlePlacementAction.MoveRight:
+                    currentPos += Vector2Int.right;
+                    break;
+
+                case PuzzlePlacementAction.MoveDown:
+                    currentPos += Vector2Int.down;
+                    break;
+
+                case PuzzlePlacementAction.RotateCounterClockwise:
+                    currentShape = RotateAutomationShape(currentShape);
+                    break;
+            }
+
+            // 下方向の移動には自動プレイ用の落下時間を使う
+            float stepInterval =
+                action == PuzzlePlacementAction.MoveDown
+                    ? automationFallStepInterval
+                    : AutomationMovementStepInterval;
+
+            await UniTask.Delay(
+                TimeSpan.FromSeconds(stepInterval),
+                cancellationToken: cancellationToken);
+        }
+
+        // 一時停止中なら、再開してから既存の固定処理を呼び出す
+        await UniTask.WaitUntil(
+            () => Time.timeScale > 0f,
+            cancellationToken: cancellationToken);
+
+        int generationBeforeFix = _pieceGeneration;
+
+        // 既存の処理を使って固定・消去・爆弾・浮き島処理を開始する
+        Move(Vector2Int.down);
+
+        // 次のピースが生成され、盤面解決と新しいピースの描画が終わるまで待つ
+        await UniTask.WaitUntil(
+            () =>
+                !enabled ||
+                (_pieceGeneration > generationBeforeFix &&
+                 !isProcessingIslands &&
+                 _lastDrawnPieceGeneration == _pieceGeneration),
+            cancellationToken: cancellationToken);
+
+        // ゲームオーバーなどで次のピースへ進めない場合はfalseを返す
+        return enabled &&
+               _pieceGeneration > generationBeforeFix &&
+               !isProcessingIslands &&
+               _lastDrawnPieceGeneration == _pieceGeneration;
+    }
+
+    private static Vector2Int[] RotateAutomationShape(Vector2Int[] shape)
+    {
+        Vector2Int[] rotated = new Vector2Int[shape.Length];
+
+        for (int i = 0; i < shape.Length; i++)
+        {
+            rotated[i] = new Vector2Int(
+                -shape[i].y,
+                shape[i].x);
+        }
+
+        return rotated;
+    }
+
+    // ==================================================
+    // 自動プレイの判断終了
+    // ==================================================
+    public void EndDecision()
+    {
+        isAutomationDecisionActive = false;
+    }
+
+    // ==================================================
+    // 自動プレイ時の落下時間を設定する
+    // 通常プレイの fallInterval には影響させない
+    // ==================================================
+    public void SetAutomationFallStepInterval(float secondsPerCell)
+    {
+        automationFallStepInterval = Mathf.Max(0.05f, secondsPerCell);
     }
 }
