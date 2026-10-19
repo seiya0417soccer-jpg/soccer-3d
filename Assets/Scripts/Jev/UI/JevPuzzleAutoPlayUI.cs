@@ -18,6 +18,10 @@ public sealed class JevPuzzleAutoPlayUI : MonoBehaviour
     [Tooltip("開発用パネルの表示切り替えキー")]
     private KeyCode _togglePanelKey = KeyCode.Tab;
 
+    [SerializeField]
+    [Tooltip("自動プレイの開始・停止キー")]
+    private KeyCode _toggleAutoPlayKey = KeyCode.J;
+
     [Header("自動プレイ")]
 
     [SerializeField]
@@ -112,6 +116,23 @@ public sealed class JevPuzzleAutoPlayUI : MonoBehaviour
             _panelRoot != null)
         {
             _panelRoot.SetActive(!_panelRoot.activeSelf);
+        }
+
+        // Jキーで自動プレイの開始・停止を切り替える
+        if (Input.GetKeyDown(_toggleAutoPlayKey) &&
+            _autoPlayer != null)
+        {
+            if (_autoPlayer.IsRunning)
+            {
+                // 実行中なら、UIの表示状態に関係なく停止を要求する
+                _autoPlayer.StopAutoPlay();
+            }
+            else if (_panelRoot != null && _panelRoot.activeSelf)
+            {
+                // UIが表示されている場合だけ開始できる
+                _autoPlayer.StartAutoPlay();
+            }
+            // UI非表示中は新しい自動プレイを開始しない
         }
 
         // 自動プレイの状態に合わせてボタンを更新する

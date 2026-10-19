@@ -22,10 +22,6 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
 {
     [Header("自動プレイ設定")]
 
-    [SerializeField]
-    [Tooltip("自動プレイの開始・停止に使用するキー")]
-    private KeyCode _toggleKey = KeyCode.J;
-
     [Header("Jev自動プレイ設定")]
 
     [SerializeField]
@@ -104,29 +100,6 @@ public sealed class JevPuzzleAutoPlayer : MonoBehaviour
         _jevClient = new JevClient();
         _candidateGenerator = new PlacementCandidateGenerator();
         _destroyToken = this.GetCancellationTokenOnDestroy();
-    }
-
-    private void Update()
-    {
-        if (!IsDevelopmentEnvironment)
-        {
-            return;
-        }
-
-        // Jキーによる開始・停止操作を維持する
-        if (!Input.GetKeyDown(_toggleKey))
-        {
-            return;
-        }
-
-        if (_isRunning)
-        {
-            StopAutoPlay();
-        }
-        else
-        {
-            StartAutoPlay();
-        }
     }
 
     /// <summary>
